@@ -58,7 +58,7 @@ class SettingsTab(QtWidgets.QWidget):
         self.opacity_spin.setRange(0.0, 1.0)
         self.opacity_spin.setSingleStep(0.05)
         self.opacity_spin.setDecimals(2)
-        self.opacity_spin.setValue(1.0)
+        self.opacity_spin.setValue(0.75)
         self.opacity_spin.setToolTip("Controls opacity of all traces in all plots. 0.0 = transparent, 1.0 = opaque.")
         graphical_settings_layout.addLayout(self._create_setting_row("Trace Opacity", self.opacity_spin))
 

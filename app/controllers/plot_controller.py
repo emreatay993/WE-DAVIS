@@ -126,7 +126,6 @@ class PlotController(QtCore.QObject):
         self.plotter.default_font_size = int(settings_tab.default_font_size_selector.currentText())
         self.plotter.hover_font_size = int(settings_tab.hover_font_size_selector.currentText())
         self.plotter.hover_mode = settings_tab.hover_mode_selector.currentText()
-        # New: global trace opacity
         try:
             self.plotter.trace_opacity = float(settings_tab.opacity_spin.value())
         except Exception:
@@ -151,7 +150,13 @@ class PlotController(QtCore.QObject):
         dfs_for_plot = {}
 
         for folder_name, group_df in df.groupby('DataFolder'):
-            plot_df_group = self._get_plot_df([selected_col], source_df=group_df)
+            group_df_processed = group_df
+            # Apply Section Data if enabled and in TIME domain
+            if self._get_data_domain() == 'TIME' and tab.section_checkbox.isChecked():
+                group_df_processed = apply_data_section(group_df_processed, tab.section_min_input.text(),
+                                                        tab.section_max_input.text())
+
+            plot_df_group = self._get_plot_df([selected_col], source_df=group_df_processed)
             if self._get_data_domain() == 'TIME' and tab.filter_checkbox.isChecked():
                 try:
                     cutoff = float(tab.cutoff_frequency_input.text())
@@ -348,7 +353,11 @@ class PlotController(QtCore.QObject):
 
         try:
             # Re-create the source DataFrame for the spectrum plot
-            plot_df = self._get_plot_df([selected_col])
+            source_df = df
+            # Apply Section Data before spectrum if enabled
+            if tab.section_checkbox.isChecked():
+                source_df = apply_data_section(source_df, tab.section_min_input.text(), tab.section_max_input.text())
+            plot_df = self._get_plot_df([selected_col], source_df=source_df)
             if tab.filter_checkbox.isChecked():
                 try:
                     cutoff = float(tab.cutoff_frequency_input.text())

@@ -47,6 +47,13 @@ class SingleDataTab(QtWidgets.QWidget):
         self.filter_order_input.setRange(1, 10)
         self.filter_order_input.setValue(2)
 
+        # Section Data controls
+        self.section_checkbox = QCheckBox("Section Data")
+        self.section_min_label = QLabel("Min Time [sec]")
+        self.section_min_input = QLineEdit()
+        self.section_max_label = QLabel("Max Time [sec]")
+        self.section_max_input = QLineEdit()
+
         self.plot_type_selector.setVisible(False)
         self.num_slices_label.setVisible(False)
         self.num_slices_input.setVisible(False)
@@ -58,6 +65,11 @@ class SingleDataTab(QtWidgets.QWidget):
         self.filter_order_input.setVisible(False)
         self.spectrum_checkbox.setVisible(False)
         self.filter_checkbox.setVisible(False)
+        self.section_checkbox.setVisible(False)
+        self.section_min_label.setVisible(False)
+        self.section_min_input.setVisible(False)
+        self.section_max_label.setVisible(False)
+        self.section_max_input.setVisible(False)
 
         selector_layout = QHBoxLayout()
         selector_layout.addWidget(self.column_selector)
@@ -72,6 +84,11 @@ class SingleDataTab(QtWidgets.QWidget):
         selector_layout.addWidget(self.cutoff_frequency_input)
         selector_layout.addWidget(self.filter_order_label)
         selector_layout.addWidget(self.filter_order_input)
+        selector_layout.addWidget(self.section_checkbox)
+        selector_layout.addWidget(self.section_min_label)
+        selector_layout.addWidget(self.section_min_input)
+        selector_layout.addWidget(self.section_max_label)
+        selector_layout.addWidget(self.section_max_input)
         selector_layout.addStretch(1)
 
         main_layout = QVBoxLayout(self)
@@ -84,6 +101,9 @@ class SingleDataTab(QtWidgets.QWidget):
         self.cutoff_frequency_input.textChanged.connect(self.plot_parameters_changed)
         self.filter_order_input.valueChanged.connect(self.plot_parameters_changed)
         self.spectrum_checkbox.stateChanged.connect(self._on_spectrum_toggled)
+        self.section_checkbox.stateChanged.connect(self._on_section_toggled)
+        self.section_min_input.editingFinished.connect(self.plot_parameters_changed)
+        self.section_max_input.editingFinished.connect(self.plot_parameters_changed)
 
         # Controls that only affect the spectrum plot
         self.plot_type_selector.currentIndexChanged.connect(self.spectrum_parameters_changed)
@@ -121,6 +141,7 @@ class SingleDataTab(QtWidgets.QWidget):
         """Shows or hides widgets that are only relevant for time-domain data."""
         self.filter_checkbox.setVisible(visible)
         self.spectrum_checkbox.setVisible(visible)
+        self.section_checkbox.setVisible(visible)
 
         # If the main features are being hidden, also hide their sub-options
         if not visible:
@@ -139,6 +160,12 @@ class SingleDataTab(QtWidgets.QWidget):
 
             # Ensure the spectrum plot is also hidden
             self.set_spectrum_plot_visibility(False)
+
+            # Hide section controls
+            self.section_min_label.setVisible(False)
+            self.section_min_input.setVisible(False)
+            self.section_max_label.setVisible(False)
+            self.section_max_input.setVisible(False)
 
     def _on_filter_toggled(self, state):
         is_checked = state == QtCore.Qt.Checked
@@ -177,6 +204,14 @@ class SingleDataTab(QtWidgets.QWidget):
             self.splitter_sizes = self.splitter.sizes()
             self.set_spectrum_plot_visibility(False)
 
+        self.plot_parameters_changed.emit()
+
+    @QtCore.pyqtSlot(int)
+    def _on_section_toggled(self, state):
+        is_checked = (state == QtCore.Qt.Checked)
+        for widget in (self.section_min_label, self.section_min_input,
+                       self.section_max_label, self.section_max_input):
+            widget.setVisible(is_checked)
         self.plot_parameters_changed.emit()
 
     def _update_colorscale_visibility(self):
