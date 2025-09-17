@@ -124,6 +124,77 @@ class PlotController(QtCore.QObject):
             colorscale=tab.colorscale_selector.currentText(),
         )
 
+    # Additional snapshot dataclasses and methods for other tabs
+    @dataclass
+    class InterfaceDataOptions:
+        interface: str
+        side: str
+
+    def _snapshot_interface_data_options(self) -> 'PlotController.InterfaceDataOptions':
+        tab = self.main_window.tab_interface_data
+        return PlotController.InterfaceDataOptions(
+            interface=tab.interface_selector.currentText(),
+            side=tab.side_selector.currentText(),
+        )
+
+    @dataclass
+    class PartLoadsOptions:
+        side: str
+        exclude: bool
+        section_enabled: bool
+        section_min_text: str
+        section_max_text: str
+        tukey_enabled: bool
+        tukey_alpha: float
+
+    def _snapshot_part_loads_options(self) -> 'PlotController.PartLoadsOptions':
+        tab = self.main_window.tab_part_loads
+        return PlotController.PartLoadsOptions(
+            side=tab.side_filter_selector.currentText(),
+            exclude=tab.exclude_checkbox.isChecked(),
+            section_enabled=tab.section_checkbox.isChecked(),
+            section_min_text=tab.section_min_input.text(),
+            section_max_text=tab.section_max_input.text(),
+            tukey_enabled=tab.tukey_checkbox.isChecked(),
+            tukey_alpha=tab.tukey_alpha_spin.value(),
+        )
+
+    @dataclass
+    class CompareDataOptions:
+        selected_column: str
+
+    def _snapshot_compare_data_options(self) -> 'PlotController.CompareDataOptions':
+        tab = self.main_window.tab_compare_data
+        return PlotController.CompareDataOptions(
+            selected_column=tab.compare_column_selector.currentText(),
+        )
+
+    @dataclass
+    class ComparePartLoadsOptions:
+        side: str
+        exclude: bool
+
+    def _snapshot_compare_part_loads_options(self) -> 'PlotController.ComparePartLoadsOptions':
+        tab = self.main_window.tab_compare_part_loads
+        return PlotController.ComparePartLoadsOptions(
+            side=tab.side_filter_selector.currentText(),
+            exclude=tab.exclude_checkbox.isChecked(),
+        )
+
+    @dataclass
+    class TimeDomainRepresentOptions:
+        frequency_text: str
+        selected_side: str
+
+    def _snapshot_time_domain_represent_options(self) -> 'PlotController.TimeDomainRepresentOptions':
+        tab_time = self.main_window.tab_time_domain_represent
+        # Side comes from Part Loads tab's side filter per existing behavior
+        side = self.main_window.tab_part_loads.side_filter_selector.currentText()
+        return PlotController.TimeDomainRepresentOptions(
+            frequency_text=tab_time.data_point_selector.currentText(),
+            selected_side=side,
+        )
+
     def _should_exclude_component(self, col_name: str) -> bool:
         """
         Checks if a column should be excluded based on the T2/T3/R2/R3 filter,
@@ -279,8 +350,9 @@ class PlotController(QtCore.QObject):
         df = self._get_df()
         if df is None: return
         tab = self.main_window.tab_interface_data
-        interface = tab.interface_selector.currentText()
-        side = tab.side_selector.currentText()
+        opts = self._snapshot_interface_data_options()
+        interface = opts.interface
+        side = opts.side
         if not interface or not side: return
 
         t_cols = [c for c in df.columns if c.startswith(interface) and side in c and any(s in c for s in ['T1', 'T2', 'T3', 'T2/T3']) and 'Phase_' not in c]
@@ -306,21 +378,21 @@ class PlotController(QtCore.QObject):
     def update_part_loads_plots(self):
         df = self._get_df()
         if df is None: return
+        opts = self._snapshot_part_loads_options()
         tab = self.main_window.tab_part_loads
-        side = tab.side_filter_selector.currentText()
+        side = opts.side
         if not side: return
 
-        exclude = tab.exclude_checkbox.isChecked()
+        exclude = opts.exclude
         df_processed = df.copy()
 
         # Call helper functions for data processing
         if self._get_data_domain() == 'TIME':
-            if tab.section_checkbox.isChecked():
-                df_processed = apply_data_section(df_processed, tab.section_min_input.text(),
-                                                  tab.section_max_input.text())
+            if opts.section_enabled:
+                df_processed = apply_data_section(df_processed, opts.section_min_text, opts.section_max_text)
 
-            if tab.tukey_checkbox.isChecked():
-                df_processed = apply_tukey_window(df_processed, tab.tukey_alpha_spin.value())
+            if opts.tukey_enabled:
+                df_processed = apply_tukey_window(df_processed, opts.tukey_alpha)
 
         # Filter columns from the (potentially) processed DataFrame
         t_cols = self._filter_part_load_cols(df_processed.columns, side, ['T1', 'T2', 'T3', 'T2/T3'], exclude)
@@ -351,11 +423,12 @@ class PlotController(QtCore.QObject):
         
         tab = self.main_window.tab_time_domain_represent
         try:
-            freq_text = tab.data_point_selector.currentText()
+            opts = self._snapshot_time_domain_represent_options()
+            freq_text = opts.frequency_text
             if not freq_text or "Select a frequency" in freq_text: return
             freq = float(freq_text)
 
-            selected_side = self.main_window.tab_part_loads.side_filter_selector.currentText()
+            selected_side = opts.selected_side
             if not selected_side:
                 tab.display_plot(go.Figure())
                 return
