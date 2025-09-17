@@ -156,18 +156,41 @@ class PlotController(QtCore.QObject):
                 group_df_processed = apply_data_section(group_df_processed, tab.section_min_input.text(),
                                                         tab.section_max_input.text())
 
-            plot_df_group = self._get_plot_df([selected_col], source_df=group_df_processed)
-            if self._get_data_domain() == 'TIME' and tab.filter_checkbox.isChecked():
-                try:
-                    cutoff = float(tab.cutoff_frequency_input.text())
-                    order = tab.filter_order_input.value()
-                    plot_df_group = apply_low_pass_filter(plot_df_group, selected_col, cutoff, order)
-                except ValueError:
-                    pass # Ignore if cutoff is not a valid number
+            if self._get_data_domain() == 'TIME' and selected_col == 'Time Step (Δt)':
+                # Compute robust Δt per folder: sort by time, coerce to numeric, null out nonpositive/near-zero steps
+                if 'TIME' not in group_df_processed.columns or len(group_df_processed) < 2:
+                    continue
+                df_sorted = group_df_processed.sort_values('TIME')
+                time_numeric = pd.to_numeric(df_sorted['TIME'], errors='coerce').astype(float)
+                # Compute differences
+                diffs = np.diff(time_numeric.values)
+                # Determine epsilon based on median positive dt to avoid FP-rounding zeros
+                positive_diffs = diffs[diffs > 0]
+                if positive_diffs.size > 0:
+                    eps = max(1e-12, 1e-6 * float(np.median(positive_diffs)))
+                else:
+                    eps = 1e-12
+                diffs[(diffs <= eps)] = np.nan
+                # Build aligned series (NaN for first sample)
+                dt_series = pd.Series(np.concatenate([[np.nan], diffs]), index=df_sorted.index, name='Δt [s]')
+                plot_df_group = dt_series.to_frame()
+                plot_df_group.index = time_numeric
+                plot_df_group.index.name = 'Time [s]'
+            else:
+                plot_df_group = self._get_plot_df([selected_col], source_df=group_df_processed)
+                if self._get_data_domain() == 'TIME' and tab.filter_checkbox.isChecked():
+                    try:
+                        cutoff = float(tab.cutoff_frequency_input.text())
+                        order = tab.filter_order_input.value()
+                        plot_df_group = apply_low_pass_filter(plot_df_group, selected_col, cutoff, order)
+                    except ValueError:
+                        pass # Ignore if cutoff is not a valid number
             dfs_for_plot[folder_name if is_multi_folder else selected_col] = plot_df_group
 
         plot_title = f"{selected_col} Plot"
-        if self.main_window.tab_settings.rolling_min_max_checkbox.isChecked() and self._get_data_domain() == 'TIME':
+        if selected_col == 'Time Step (Δt)':
+            fig = self.plotter.create_standard_figure(dfs_for_plot, title='Time Step (Δt)', y_axis_title='Time Step [s]')
+        elif self.main_window.tab_settings.rolling_min_max_checkbox.isChecked() and self._get_data_domain() == 'TIME':
             try:
                 points = int(self.main_window.tab_settings.desired_num_points_input.text())
                 as_bars = self.main_window.tab_settings.plot_as_bars_checkbox.isChecked()
@@ -178,7 +201,9 @@ class PlotController(QtCore.QObject):
             fig = self.plotter.create_standard_figure(dfs_for_plot, title=plot_title)
         tab.display_regular_plot(fig)
 
-        if self._get_data_domain() == 'FREQ' and not is_multi_folder:
+        if selected_col == 'Time Step (Δt)':
+            tab.set_phase_plot_visibility(False)
+        elif self._get_data_domain() == 'FREQ' and not is_multi_folder:
             phase_col = f'Phase_{selected_col}'
             if phase_col in df.columns:
                 phase_df = self._get_plot_df([phase_col])
@@ -346,7 +371,7 @@ class PlotController(QtCore.QObject):
 
         tab = self.main_window.tab_single_data
         selected_col = tab.column_selector.currentText()
-        if not selected_col or not tab.spectrum_checkbox.isChecked(): return
+        if not selected_col or selected_col == 'Time Step (Δt)' or not tab.spectrum_checkbox.isChecked(): return
 
         is_multi_folder = df['DataFolder'].nunique() > 1
         if is_multi_folder: return

@@ -139,6 +139,9 @@ class MainWindow(QMainWindow):
         regular_cols = [c for c in self.df.columns if 'Phase_' not in c and c not in ['FREQ', 'TIME', 'NO', 'DataFolder']]
         self.tab_single_data.column_selector.clear()
         self.tab_single_data.column_selector.addItems(regular_cols)
+        # Add computed option for time-domain only
+        if self.data_domain == 'TIME':
+            self.tab_single_data.column_selector.addItem('Time Step (Δt)')
 
         # Interface Data Tab
         interfaces = natsorted(list(set(re.match(r'I\d+[A-Za-z]?', c.split(' ')[0]).group(0) for c in self.df.columns if re.match(r'I\d+[A-Za-z]?', c.split(' ')[0]))))
