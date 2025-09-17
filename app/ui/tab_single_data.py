@@ -15,6 +15,8 @@ class SingleDataTab(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.splitter_sizes = None
+        self._time_domain_features_enabled = False
+        self._computed_selection_active = False
         self._setup_ui()
 
     def _setup_ui(self):
@@ -96,7 +98,7 @@ class SingleDataTab(QtWidgets.QWidget):
         main_layout.addWidget(self.splitter)
 
         # Controls that affect the main plot
-        self.column_selector.currentIndexChanged.connect(self.plot_parameters_changed)
+        self.column_selector.currentIndexChanged.connect(self._on_column_changed)
         self.filter_checkbox.stateChanged.connect(self._on_filter_toggled)
         self.cutoff_frequency_input.textChanged.connect(self.plot_parameters_changed)
         self.filter_order_input.valueChanged.connect(self.plot_parameters_changed)
@@ -139,6 +141,8 @@ class SingleDataTab(QtWidgets.QWidget):
 
     def set_time_domain_features_visibility(self, visible):
         """Shows or hides widgets that are only relevant for time-domain data."""
+        self._time_domain_features_enabled = visible
+        # Base visibility
         self.filter_checkbox.setVisible(visible)
         self.spectrum_checkbox.setVisible(visible)
         self.section_checkbox.setVisible(visible)
@@ -166,6 +170,21 @@ class SingleDataTab(QtWidgets.QWidget):
             self.section_min_input.setVisible(False)
             self.section_max_label.setVisible(False)
             self.section_max_input.setVisible(False)
+
+        # If a computed selection is active, force-hide filter/spectrum controls
+        if self._computed_selection_active:
+            self.filter_checkbox.setVisible(False)
+            self.cutoff_frequency_label.setVisible(False)
+            self.cutoff_frequency_input.setVisible(False)
+            self.filter_order_label.setVisible(False)
+            self.filter_order_input.setVisible(False)
+            self.spectrum_checkbox.setVisible(False)
+            self.plot_type_selector.setVisible(False)
+            self.num_slices_label.setVisible(False)
+            self.num_slices_input.setVisible(False)
+            self.colorscale_label.setVisible(False)
+            self.colorscale_selector.setVisible(False)
+            self.set_spectrum_plot_visibility(False)
 
     def _on_filter_toggled(self, state):
         is_checked = state == QtCore.Qt.Checked
@@ -212,6 +231,41 @@ class SingleDataTab(QtWidgets.QWidget):
         for widget in (self.section_min_label, self.section_min_input,
                        self.section_max_label, self.section_max_input):
             widget.setVisible(is_checked)
+        self.plot_parameters_changed.emit()
+
+    @QtCore.pyqtSlot(int)
+    def _on_column_changed(self, index):
+        text = self.column_selector.currentText()
+        is_computed = text in ('Time Step (Δt)', 'Sampling Rate (Hz)')
+        self._computed_selection_active = is_computed
+
+        if is_computed:
+            # Uncheck and hide spectrum controls
+            if self.spectrum_checkbox.isChecked():
+                self.spectrum_checkbox.setChecked(False)
+            self.spectrum_checkbox.setVisible(False)
+            self.plot_type_selector.setVisible(False)
+            self.num_slices_label.setVisible(False)
+            self.num_slices_input.setVisible(False)
+            self.colorscale_label.setVisible(False)
+            self.colorscale_selector.setVisible(False)
+            self.set_spectrum_plot_visibility(False)
+
+            # Uncheck and hide filter controls
+            if self.filter_checkbox.isChecked():
+                self.filter_checkbox.setChecked(False)
+            self.filter_checkbox.setVisible(False)
+            self.cutoff_frequency_label.setVisible(False)
+            self.cutoff_frequency_input.setVisible(False)
+            self.filter_order_label.setVisible(False)
+            self.filter_order_input.setVisible(False)
+        else:
+            # Restore visibility according to time-domain availability
+            if self._time_domain_features_enabled:
+                self.filter_checkbox.setVisible(True)
+                self.spectrum_checkbox.setVisible(True)
+
+        # Trigger a full plot update
         self.plot_parameters_changed.emit()
 
     def _update_colorscale_visibility(self):
