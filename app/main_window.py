@@ -73,6 +73,8 @@ class MainWindow(QMainWindow):
         view_menu = menu_bar.addMenu("View")
         self.open_action = QAction("Open New Data", self)
         file_menu.addAction(self.open_action)
+        self.export_full_csv_action = QAction("Export Full Data as CSV", self)
+        file_menu.addAction(self.export_full_csv_action)
 
         # Dock Widget
         self.dock = DirectoryTreeDock(self)
@@ -107,6 +109,7 @@ class MainWindow(QMainWindow):
         self.data_manager.comparisonDataLoaded.connect(self.on_comparison_data_loaded)
         self.dock.directories_selected.connect(self._on_directories_selected)
         self.open_action.triggered.connect(self.data_manager.load_data_from_directory)
+        self.export_full_csv_action.triggered.connect(self._export_full_data_csv)
 
         # Plot Update Signals (Connected to PlotController)
         self.tab_single_data.plot_parameters_changed.connect(self.plot_controller.update_single_data_plots)
@@ -233,3 +236,25 @@ class MainWindow(QMainWindow):
             return
 
         self.data_manager.load_data_from_paths(folder_paths)
+
+    @QtCore.pyqtSlot()
+    def _export_full_data_csv(self):
+        if self.df is None:
+            QMessageBox.warning(self, "No Data", "Please load data first before exporting.")
+            return
+        options = QtWidgets.QFileDialog.Options()
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Export Full Data as CSV",
+            "full_data.csv",
+            "CSV Files (*.csv)",
+            options=options
+        )
+        if not file_path:
+            return
+        try:
+            # Include DataFolder to preserve grouping; export current combined df
+            self.df.to_csv(file_path, index=False)
+            QMessageBox.information(self, "Success", f"Data exported to {os.path.basename(file_path)}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to export CSV: {e}")

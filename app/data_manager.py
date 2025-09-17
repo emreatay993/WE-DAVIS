@@ -97,10 +97,6 @@ class DataManager(QtCore.QObject):
         # Sort the final DataFrame by the domain column
         final_df = final_df.sort_values(by=data_domain).reset_index(drop=True)
 
-        # Save the combined data to a CSV
-        final_df.to_csv("full_data.csv", index=False)
-        print(f"Data from {len(combined_dfs)} folder(s) processed and saved to full_data.csv")
-
         # Emit the signal with the combined results
         self.dataLoaded.emit(final_df, data_domain, first_valid_folder)
 
