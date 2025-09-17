@@ -406,7 +406,11 @@ class PlotController(QtCore.QObject):
         diff_df = self._calculate_differences([selected_column])
         if diff_df.empty: return
 
-        abs_diff_df = self._get_plot_df([], source_df=pd.DataFrame({'Absolute Difference': diff_df.iloc[:, 0]}))
+        # Build plot-ready DataFrame with domain index for absolute difference
+        domain_col = self._get_data_domain()
+        abs_diff_df = pd.DataFrame({'Absolute Difference': diff_df.iloc[:, 0].values})
+        abs_diff_df.index = self._get_df()[domain_col]
+        abs_diff_df.index.name = 'Time [s]' if domain_col == 'TIME' else 'Freq [Hz]'
         fig_abs_diff = self.plotter.create_standard_figure(abs_diff_df,
                                                            f'{selected_column} Absolute Difference')
         tab.display_absolute_diff_plot(fig_abs_diff)
@@ -414,7 +418,9 @@ class PlotController(QtCore.QObject):
         with np.errstate(divide='ignore', invalid='ignore'):
             relative_diff = np.divide(100 * diff_df.iloc[:, 0], np.abs(self._get_df()[selected_column]))
             relative_diff.fillna(0, inplace=True)
-        rel_diff_df = self._get_plot_df([], source_df=pd.DataFrame({'Relative Difference (%)': relative_diff}))
+        rel_diff_df = pd.DataFrame({'Relative Difference (%)': relative_diff.values})
+        rel_diff_df.index = self._get_df()[domain_col]
+        rel_diff_df.index.name = 'Time [s]' if domain_col == 'TIME' else 'Freq [Hz]'
         fig_rel_diff = self.plotter.create_standard_figure(rel_diff_df,
                                                            f'{selected_column} Relative Difference (%)', "Percent (%)")
         tab.display_relative_diff_plot(fig_rel_diff)
@@ -433,8 +439,18 @@ class PlotController(QtCore.QObject):
         r_cols = self._filter_part_load_cols(self._get_df().columns, selected_side,
                                              ["R1", "R2", "R3", "R2/R3"], exclude)
 
-        t_diff_df = self._get_plot_df([], source_df=self._calculate_differences(t_cols))
-        r_diff_df = self._get_plot_df([], source_df=self._calculate_differences(r_cols))
+        # Build plot-ready DataFrames with domain index for differences
+        domain_col = self._get_data_domain()
+        t_diff = self._calculate_differences(t_cols)
+        r_diff = self._calculate_differences(r_cols)
+        t_diff_df = pd.DataFrame(t_diff) if not t_diff.empty else pd.DataFrame()
+        r_diff_df = pd.DataFrame(r_diff) if not r_diff.empty else pd.DataFrame()
+        if not t_diff_df.empty:
+            t_diff_df.index = self._get_df()[domain_col]
+            t_diff_df.index.name = 'Time [s]' if domain_col == 'TIME' else 'Freq [Hz]'
+        if not r_diff_df.empty:
+            r_diff_df.index = self._get_df()[domain_col]
+            r_diff_df.index.name = 'Time [s]' if domain_col == 'TIME' else 'Freq [Hz]'
         
         fig_t = self.plotter.create_standard_figure(t_diff_df,
                                                     f'Translational Components, Difference (Δ) - {selected_side}')
