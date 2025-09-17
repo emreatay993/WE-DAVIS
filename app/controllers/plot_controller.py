@@ -156,7 +156,7 @@ class PlotController(QtCore.QObject):
                 group_df_processed = apply_data_section(group_df_processed, tab.section_min_input.text(),
                                                         tab.section_max_input.text())
 
-            if self._get_data_domain() == 'TIME' and selected_col == 'Time Step (Δt)':
+            if self._get_data_domain() == 'TIME' and selected_col in ('Time Step (Δt)', 'Sampling Rate (Hz)'):
                 # Compute robust Δt per folder: sort by time, coerce to numeric, null out nonpositive/near-zero steps
                 if 'TIME' not in group_df_processed.columns or len(group_df_processed) < 2:
                     continue
@@ -171,9 +171,15 @@ class PlotController(QtCore.QObject):
                 else:
                     eps = 1e-12
                 diffs[(diffs <= eps)] = np.nan
-                # Build aligned series (NaN for first sample)
-                dt_series = pd.Series(np.concatenate([[np.nan], diffs]), index=df_sorted.index, name='Δt [s]')
-                plot_df_group = dt_series.to_frame()
+                # Build aligned series (NaN for first sample). Compute either dt or fs.
+                if selected_col == 'Time Step (Δt)':
+                    series = pd.Series(np.concatenate([[np.nan], diffs]), index=df_sorted.index, name='Δt [s]')
+                else:
+                    with np.errstate(divide='ignore', invalid='ignore'):
+                        inv = 1.0 / diffs
+                        inv[~np.isfinite(inv)] = np.nan
+                    series = pd.Series(np.concatenate([[np.nan], inv]), index=df_sorted.index, name='Sampling Rate [Hz]')
+                plot_df_group = series.to_frame()
                 plot_df_group.index = time_numeric
                 plot_df_group.index.name = 'Time [s]'
             else:
@@ -190,6 +196,8 @@ class PlotController(QtCore.QObject):
         plot_title = f"{selected_col} Plot"
         if selected_col == 'Time Step (Δt)':
             fig = self.plotter.create_standard_figure(dfs_for_plot, title='Time Step (Δt)', y_axis_title='Time Step [s]')
+        elif selected_col == 'Sampling Rate (Hz)':
+            fig = self.plotter.create_standard_figure(dfs_for_plot, title='Sampling Rate (Hz)', y_axis_title='Sampling Rate [Hz]')
         elif self.main_window.tab_settings.rolling_min_max_checkbox.isChecked() and self._get_data_domain() == 'TIME':
             try:
                 points = int(self.main_window.tab_settings.desired_num_points_input.text())
@@ -201,7 +209,7 @@ class PlotController(QtCore.QObject):
             fig = self.plotter.create_standard_figure(dfs_for_plot, title=plot_title)
         tab.display_regular_plot(fig)
 
-        if selected_col == 'Time Step (Δt)':
+        if selected_col in ('Time Step (Δt)', 'Sampling Rate (Hz)'):
             tab.set_phase_plot_visibility(False)
         elif self._get_data_domain() == 'FREQ' and not is_multi_folder:
             phase_col = f'Phase_{selected_col}'
@@ -371,7 +379,7 @@ class PlotController(QtCore.QObject):
 
         tab = self.main_window.tab_single_data
         selected_col = tab.column_selector.currentText()
-        if not selected_col or selected_col == 'Time Step (Δt)' or not tab.spectrum_checkbox.isChecked(): return
+        if not selected_col or selected_col in ('Time Step (Δt)', 'Sampling Rate (Hz)') or not tab.spectrum_checkbox.isChecked(): return
 
         is_multi_folder = df['DataFolder'].nunique() > 1
         if is_multi_folder: return
