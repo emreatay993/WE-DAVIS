@@ -174,7 +174,8 @@ class MainWindow(QMainWindow):
 
         num_folders = self.df['DataFolder'].nunique()
         if num_folders > 1:
-            title = f"WE MechLoad Viewer - ({num_folders} Data Folders Loaded)"
+            parent = os.path.basename(os.path.dirname(self.raw_data_folder))
+            title = f"WE MechLoad Viewer - (Directory: {parent} | {num_folders} Data Folders Loaded)"
         else:
             parent = os.path.basename(os.path.dirname(self.raw_data_folder))
             selected = os.path.basename(self.raw_data_folder)
