@@ -5,11 +5,41 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from PyQt5 import QtCore
+from dataclasses import dataclass
 
-from ..analysis.data_processing import apply_data_section, apply_tukey_window, apply_low_pass_filter
+from ..analysis.data_processing import (
+    apply_data_section,
+    apply_tukey_window,
+    apply_low_pass_filter,
+    compute_time_step_series,
+    compute_sampling_rate_series,
+    build_series_by_folder,
+    build_dt_by_folder,
+    build_fs_by_folder,
+    build_multi_series_for_single,
+)
+
+
+@dataclass
+class SingleDataOptions:
+    selected_col: str
+    section_enabled: bool
+    section_min_text: str
+    section_max_text: str
+    filter_enabled: bool
+    cutoff_frequency_text: str
+    filter_order: int
+    spectrum_enabled: bool
+    num_slices_text: str
+    plot_type: str
+    colorscale: str
 
 
 class PlotController(QtCore.QObject):
+    # Constants for computed selections
+    TIME_STEP_LABEL = 'Time Step (Δt)'
+    FS_LABEL = 'Sampling Rate (Hz)'
+
     """
     Handles all logic for updating plots in response to UI changes.
     """
@@ -45,6 +75,54 @@ class PlotController(QtCore.QObject):
         plot_df.index = x_data
         plot_df.index.name = x_label
         return plot_df
+
+    def _is_multi_folder(self) -> bool:
+        df = self._get_df()
+        try:
+            return df is not None and 'DataFolder' in df.columns and df['DataFolder'].nunique() > 1
+        except Exception:
+            return False
+
+    def _is_computed_metric(self, name: str) -> bool:
+        return name in (self.TIME_STEP_LABEL, self.FS_LABEL)
+
+    def _get_phase_col(self, col: str) -> str:
+        return f'Phase_{col}'
+
+    def _update_phase_plot_for_single(self, selected_col: str, is_multi_folder: bool) -> None:
+        """Shows/hides the phase plot matching current behavior for Single Data tab."""
+        df = self._get_df()
+        tab = self.main_window.tab_single_data
+        if self._is_computed_metric(selected_col):
+            tab.set_phase_plot_visibility(False)
+            return
+        if self._get_data_domain() == 'FREQ' and not is_multi_folder:
+            phase_col = self._get_phase_col(selected_col)
+            if phase_col in df.columns:
+                phase_df = self._get_plot_df([phase_col])
+                phase_fig = self.plotter.create_standard_figure({phase_col: phase_df}, f'Phase of {selected_col}', 'Phase [deg]')
+                tab.set_phase_plot_visibility(True)
+                tab.display_phase_plot(phase_fig)
+            else:
+                tab.set_phase_plot_visibility(False)
+        else:
+            tab.set_phase_plot_visibility(False)
+
+    def _snapshot_single_data_options(self) -> SingleDataOptions:
+        tab = self.main_window.tab_single_data
+        return SingleDataOptions(
+            selected_col=tab.column_selector.currentText(),
+            section_enabled=tab.section_checkbox.isChecked(),
+            section_min_text=tab.section_min_input.text(),
+            section_max_text=tab.section_max_input.text(),
+            filter_enabled=tab.filter_checkbox.isChecked(),
+            cutoff_frequency_text=tab.cutoff_frequency_input.text(),
+            filter_order=tab.filter_order_input.value(),
+            spectrum_enabled=tab.spectrum_checkbox.isChecked(),
+            num_slices_text=tab.num_slices_input.text(),
+            plot_type=tab.plot_type_selector.currentText(),
+            colorscale=tab.colorscale_selector.currentText(),
+        )
 
     def _should_exclude_component(self, col_name: str) -> bool:
         """
@@ -143,61 +221,43 @@ class PlotController(QtCore.QObject):
         df = self._get_df()
         if df is None: return
         tab = self.main_window.tab_single_data
-        selected_col = tab.column_selector.currentText()
+        opts = self._snapshot_single_data_options()
+        selected_col = opts.selected_col
         if not selected_col: return
 
-        is_multi_folder = df['DataFolder'].nunique() > 1
-        dfs_for_plot = {}
-
-        for folder_name, group_df in df.groupby('DataFolder'):
-            group_df_processed = group_df
-            # Apply Section Data if enabled and in TIME domain
-            if self._get_data_domain() == 'TIME' and tab.section_checkbox.isChecked():
-                group_df_processed = apply_data_section(group_df_processed, tab.section_min_input.text(),
-                                                        tab.section_max_input.text())
-
-            if self._get_data_domain() == 'TIME' and selected_col in ('Time Step (Δt)', 'Sampling Rate (Hz)'):
-                # Compute robust Δt per folder: sort by time, coerce to numeric, null out nonpositive/near-zero steps
-                if 'TIME' not in group_df_processed.columns or len(group_df_processed) < 2:
-                    continue
-                df_sorted = group_df_processed.sort_values('TIME')
-                time_numeric = pd.to_numeric(df_sorted['TIME'], errors='coerce').astype(float)
-                # Compute differences
-                diffs = np.diff(time_numeric.values)
-                # Determine epsilon based on median positive dt to avoid FP-rounding zeros
-                positive_diffs = diffs[diffs > 0]
-                if positive_diffs.size > 0:
-                    eps = max(1e-12, 1e-6 * float(np.median(positive_diffs)))
-                else:
-                    eps = 1e-12
-                diffs[(diffs <= eps)] = np.nan
-                # Build aligned series (NaN for first sample). Compute either dt or fs.
-                if selected_col == 'Time Step (Δt)':
-                    series = pd.Series(np.concatenate([[np.nan], diffs]), index=df_sorted.index, name='Δt [s]')
-                else:
-                    with np.errstate(divide='ignore', invalid='ignore'):
-                        inv = 1.0 / diffs
-                        inv[~np.isfinite(inv)] = np.nan
-                    series = pd.Series(np.concatenate([[np.nan], inv]), index=df_sorted.index, name='Sampling Rate [Hz]')
-                plot_df_group = series.to_frame()
-                plot_df_group.index = time_numeric
-                plot_df_group.index.name = 'Time [s]'
-            else:
-                plot_df_group = self._get_plot_df([selected_col], source_df=group_df_processed)
-                if self._get_data_domain() == 'TIME' and tab.filter_checkbox.isChecked():
-                    try:
-                        cutoff = float(tab.cutoff_frequency_input.text())
-                        order = tab.filter_order_input.value()
-                        plot_df_group = apply_low_pass_filter(plot_df_group, selected_col, cutoff, order)
-                    except ValueError:
-                        pass # Ignore if cutoff is not a valid number
-            dfs_for_plot[folder_name if is_multi_folder else selected_col] = plot_df_group
+        is_multi_folder = self._is_multi_folder()
+        # Use builders to construct the plot data map
+        if self._get_data_domain() == 'TIME' and selected_col == self.TIME_STEP_LABEL:
+            dfs_for_plot = build_dt_by_folder(df, section_enabled=opts.section_enabled,
+                                              t_min_text=opts.section_min_text, t_max_text=opts.section_max_text)
+            # Key for single-folder case should be selected_col to keep legend titles consistent
+            if not is_multi_folder and dfs_for_plot:
+                only_key = next(iter(dfs_for_plot))
+                dfs_for_plot = {selected_col: dfs_for_plot[only_key]}
+        elif self._get_data_domain() == 'TIME' and selected_col == self.FS_LABEL:
+            dfs_for_plot = build_fs_by_folder(df, section_enabled=opts.section_enabled,
+                                              t_min_text=opts.section_min_text, t_max_text=opts.section_max_text)
+            if not is_multi_folder and dfs_for_plot:
+                only_key = next(iter(dfs_for_plot))
+                dfs_for_plot = {selected_col: dfs_for_plot[only_key]}
+        else:
+            dfs_for_plot = build_series_by_folder(
+                df,
+                selected_col=selected_col,
+                data_domain=self._get_data_domain(),
+                section_enabled=opts.section_enabled,
+                t_min_text=opts.section_min_text,
+                t_max_text=opts.section_max_text,
+                filter_enabled=opts.filter_enabled,
+                cutoff_text=opts.cutoff_frequency_text,
+                filter_order=opts.filter_order,
+            )
 
         plot_title = f"{selected_col} Plot"
-        if selected_col == 'Time Step (Δt)':
-            fig = self.plotter.create_standard_figure(dfs_for_plot, title='Time Step (Δt)', y_axis_title='Time Step [s]')
-        elif selected_col == 'Sampling Rate (Hz)':
-            fig = self.plotter.create_standard_figure(dfs_for_plot, title='Sampling Rate (Hz)', y_axis_title='Sampling Rate [Hz]')
+        if selected_col == self.TIME_STEP_LABEL:
+            fig = self.plotter.create_standard_figure(dfs_for_plot, title=self.TIME_STEP_LABEL, y_axis_title='Time Step [s]')
+        elif selected_col == self.FS_LABEL:
+            fig = self.plotter.create_standard_figure(dfs_for_plot, title=self.FS_LABEL, y_axis_title='Sampling Rate [Hz]')
         elif self.main_window.tab_settings.rolling_min_max_checkbox.isChecked() and self._get_data_domain() == 'TIME':
             try:
                 points = int(self.main_window.tab_settings.desired_num_points_input.text())
@@ -209,21 +269,9 @@ class PlotController(QtCore.QObject):
             fig = self.plotter.create_standard_figure(dfs_for_plot, title=plot_title)
         tab.display_regular_plot(fig)
 
-        if selected_col in ('Time Step (Δt)', 'Sampling Rate (Hz)'):
-            tab.set_phase_plot_visibility(False)
-        elif self._get_data_domain() == 'FREQ' and not is_multi_folder:
-            phase_col = f'Phase_{selected_col}'
-            if phase_col in df.columns:
-                phase_df = self._get_plot_df([phase_col])
-                phase_fig = self.plotter.create_standard_figure({phase_col: phase_df}, f'Phase of {selected_col}', 'Phase [deg]')
-                tab.set_phase_plot_visibility(True)
-                tab.display_phase_plot(phase_fig)
-            else:
-                tab.set_phase_plot_visibility(False)
-        else:
-            tab.set_phase_plot_visibility(False)
+        self._update_phase_plot_for_single(selected_col, is_multi_folder)
 
-        if self._get_data_domain() == 'TIME' and tab.spectrum_checkbox.isChecked() and not is_multi_folder:
+        if self._get_data_domain() == 'TIME' and opts.spectrum_enabled and not is_multi_folder:
             self.update_spectrum_plot_only()
 
     @QtCore.pyqtSlot()
@@ -238,8 +286,21 @@ class PlotController(QtCore.QObject):
         t_cols = [c for c in df.columns if c.startswith(interface) and side in c and any(s in c for s in ['T1', 'T2', 'T3', 'T2/T3']) and 'Phase_' not in c]
         r_cols = [c for c in df.columns if c.startswith(interface) and side in c and any(s in c for s in ['R1', 'R2', 'R3', 'R2/R3']) and 'Phase_' not in c]
 
-        tab.display_t_series_plot(self.plotter.create_standard_figure(self._get_plot_df(t_cols), f'Translational Components - {side}'))
-        tab.display_r_series_plot(self.plotter.create_standard_figure(self._get_plot_df(r_cols), f'Rotational Components - {side}'))
+        t_df = build_multi_series_for_single(
+            df,
+            columns=t_cols,
+            data_domain=self._get_data_domain(),
+            section_enabled=False,
+        )
+        r_df = build_multi_series_for_single(
+            df,
+            columns=r_cols,
+            data_domain=self._get_data_domain(),
+            section_enabled=False,
+        )
+
+        tab.display_t_series_plot(self.plotter.create_standard_figure(t_df, f'Translational Components - {side}'))
+        tab.display_r_series_plot(self.plotter.create_standard_figure(r_df, f'Rotational Components - {side}'))
 
     @QtCore.pyqtSlot()
     def update_part_loads_plots(self):
@@ -265,11 +326,23 @@ class PlotController(QtCore.QObject):
         t_cols = self._filter_part_load_cols(df_processed.columns, side, ['T1', 'T2', 'T3', 'T2/T3'], exclude)
         r_cols = self._filter_part_load_cols(df_processed.columns, side, ['R1', 'R2', 'R3', 'R2/R3'], exclude)
 
-        # Use the processed DataFrame as the source for the plots
-        tab.display_t_series_plot(self.plotter.create_standard_figure(self._get_plot_df(t_cols, source_df=df_processed),
-                                                                      f'Translational Components - {side}'))
-        tab.display_r_series_plot(self.plotter.create_standard_figure(self._get_plot_df(r_cols, source_df=df_processed),
-                                                                      f'Rotational Components- {side}'))
+        # Use the processed DataFrame as the source for the plots (single-folder builder)
+        t_df = build_multi_series_for_single(
+            df_processed,
+            columns=t_cols,
+            data_domain=self._get_data_domain(),
+            section_enabled=False,
+            tukey_enabled=False,
+        )
+        r_df = build_multi_series_for_single(
+            df_processed,
+            columns=r_cols,
+            data_domain=self._get_data_domain(),
+            section_enabled=False,
+            tukey_enabled=False,
+        )
+        tab.display_t_series_plot(self.plotter.create_standard_figure(t_df, f'Translational Components - {side}'))
+        tab.display_r_series_plot(self.plotter.create_standard_figure(r_df, f'Rotational Components- {side}'))
     
     @QtCore.pyqtSlot()
     def update_time_domain_represent_plot(self):
@@ -378,23 +451,24 @@ class PlotController(QtCore.QObject):
         if df is None or self._get_data_domain() != 'TIME': return
 
         tab = self.main_window.tab_single_data
-        selected_col = tab.column_selector.currentText()
-        if not selected_col or selected_col in ('Time Step (Δt)', 'Sampling Rate (Hz)') or not tab.spectrum_checkbox.isChecked(): return
+        opts = self._snapshot_single_data_options()
+        selected_col = opts.selected_col
+        if not selected_col or selected_col in (self.TIME_STEP_LABEL, self.FS_LABEL) or not opts.spectrum_enabled: return
 
-        is_multi_folder = df['DataFolder'].nunique() > 1
+        is_multi_folder = self._is_multi_folder()
         if is_multi_folder: return
 
         try:
             # Re-create the source DataFrame for the spectrum plot
             source_df = df
             # Apply Section Data before spectrum if enabled
-            if tab.section_checkbox.isChecked():
-                source_df = apply_data_section(source_df, tab.section_min_input.text(), tab.section_max_input.text())
+            if opts.section_enabled:
+                source_df = apply_data_section(source_df, opts.section_min_text, opts.section_max_text)
             plot_df = self._get_plot_df([selected_col], source_df=source_df)
-            if tab.filter_checkbox.isChecked():
+            if opts.filter_enabled:
                 try:
-                    cutoff = float(tab.cutoff_frequency_input.text())
-                    order = tab.filter_order_input.value()
+                    cutoff = float(opts.cutoff_frequency_text)
+                    order = opts.filter_order
                     plot_df = apply_low_pass_filter(plot_df, selected_col, cutoff, order)
                 except ValueError:
                     pass # Ignore if cutoff is not a valid number
@@ -402,9 +476,9 @@ class PlotController(QtCore.QObject):
             # Generate and display the spectrum plot
             fig_spec = self.plotter.create_spectrum_figure(
                 plot_df,
-                num_slices=int(tab.num_slices_input.text()),
-                plot_type=tab.plot_type_selector.currentText(),
-                colorscale=tab.colorscale_selector.currentText()
+                num_slices=int(opts.num_slices_text),
+                plot_type=opts.plot_type,
+                colorscale=opts.colorscale
             )
             tab.set_spectrum_plot_visibility(True)
             tab.display_spectrum_plot(fig_spec)

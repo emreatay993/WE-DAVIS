@@ -144,8 +144,9 @@ class MainWindow(QMainWindow):
         self.tab_single_data.column_selector.addItems(regular_cols)
         # Add computed option for time-domain only
         if self.data_domain == 'TIME':
-            self.tab_single_data.column_selector.addItem('Time Step (Δt)')
-            self.tab_single_data.column_selector.addItem('Sampling Rate (Hz)')
+            # Use controller's constants to keep labels consistent
+            self.tab_single_data.column_selector.addItem(self.plot_controller.TIME_STEP_LABEL)
+            self.tab_single_data.column_selector.addItem(self.plot_controller.FS_LABEL)
 
         # Interface Data Tab
         interfaces = natsorted(list(set(re.match(r'I\d+[A-Za-z]?', c.split(' ')[0]).group(0) for c in self.df.columns if re.match(r'I\d+[A-Za-z]?', c.split(' ')[0]))))
