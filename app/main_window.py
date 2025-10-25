@@ -209,20 +209,25 @@ class MainWindow(QMainWindow):
     def on_comparison_data_loaded(self, df_compare):
         if self.df is None:
             QMessageBox.warning(self, "Error", "Please load the primary data first.")
+            self.df_compare = None  # Ensure compare df is cleared
             return
 
         if self.data_domain not in df_compare.columns:
             QMessageBox.critical(self, "Domain Mismatch", f"Comparison data needs a '{self.data_domain}' column.")
+            self.df_compare = None  # Ensure compare df is cleared
+            # Also clear the combobox
+            self.plot_controller.update_compare_column_list()
             return
 
+        # Set the dataframe first
         self.df_compare = df_compare
-        
-        regular_cols = [c for c in self.df.columns if 'Phase_' not in c and c not in ['FREQ', 'TIME', 'NO']]
-        self.tab_compare_data.compare_column_selector.clear()
-        self.tab_compare_data.compare_column_selector.addItems(regular_cols)
+
+        # Now, call the controller to update the column list based on common columns
+        self.plot_controller.update_compare_column_list()
 
         QMessageBox.information(self, "Success", "Comparison data loaded successfully.")
-        
+
+        # These will now use the updated (and valid) combobox selection
         self.plot_controller.update_compare_data_plots()
         self.plot_controller.update_compare_part_loads_plots()
 

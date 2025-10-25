@@ -50,6 +50,19 @@ class CompareDataTab(QtWidgets.QWidget):
         self.compare_button.clicked.connect(self.select_compare_data_requested)
         self.compare_column_selector.currentIndexChanged.connect(self.plot_parameters_changed)
 
+    def update_column_selector(self, columns):
+        """
+        Clears and repopulates the column selector combobox with a new list.
+        Tries to preserve the current selection if it still exists.
+        """
+        current_text = self.compare_column_selector.currentText()
+        self.compare_column_selector.clear()
+        self.compare_column_selector.addItems(columns)
+
+        # Try to re-select the previously selected item if it's still valid
+        if current_text in columns:
+            self.compare_column_selector.setCurrentText(current_text)
+
     def display_comparison_plot(self, fig):
         load_fig_to_webview(fig, self.compare_regular_plot)
 

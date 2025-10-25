@@ -54,6 +54,33 @@ class PlotController(QtCore.QObject):
     def _get_compare_df(self):
         return self.main_window.df_compare
 
+    def _get_common_columns(self):
+        """
+        Returns a sorted list of data columns that are present in
+        BOTH the primary and comparison dataframes.
+        """
+        df_compare = self._get_compare_df()
+        # Get data columns from the *primary* dataframe (this already filters domain col)
+        data_cols_primary = self.data_manager.get_data_columns(include_phase=True)
+
+        if data_cols_primary is None:
+            # If primary isn't loaded, return empty
+            return []
+
+        if df_compare is None:
+            # If compare isn't loaded, just return all primary columns
+            # This handles the initial state before a comparison file is chosen.
+            return sorted(data_cols_primary)
+
+        # Both are loaded, find the intersection
+        cols_compare = set(df_compare.columns)
+        common_cols = [
+            col for col in data_cols_primary
+            if col in cols_compare
+        ]
+
+        return sorted(common_cols)
+
     def _get_data_domain(self):
         return self.main_window.data_domain
 
@@ -234,36 +261,68 @@ class PlotController(QtCore.QObject):
             final_cols = [col for col in final_cols if not self._should_exclude_component(col)]
 
         return final_cols
-    
+
     def _calculate_differences(self, columns):
-        """Calculates the absolute difference between two dataframes for given columns."""
+        """Calculates the absolute difference between two dataframes for given columns,
+           gracefully skipping columns not present in both dataframes."""
         df = self._get_df()
         df_compare = self._get_compare_df()
         data_domain = self._get_data_domain()
-        
+
         if df is None or df_compare is None:
             return pd.DataFrame()
 
         diff_dict = {}
         for col in columns:
+            # Explicitly check if the main column exists in BOTH dataframes first
             if col not in df.columns or col not in df_compare.columns:
+                print(f"Skipping difference calculation for '{col}': Column not present in both datasets.")
                 continue
 
             mag1, mag2 = df[col], df_compare[col]
+            diff = np.nan  # Default to NaN difference if calculation fails
 
             if data_domain == 'FREQ':
                 phase_col = f'Phase_{col}'
+                # Check if phase columns exist in BOTH dataframes
                 if phase_col in df.columns and phase_col in df_compare.columns:
-                    p1_rad = np.deg2rad(df[phase_col])
-                    p2_rad = np.deg2rad(df_compare[phase_col])
-                    diff = np.abs((mag1 * np.exp(1j * p1_rad)) - (mag2 * np.exp(1j * p2_rad)))
+                    try:
+                        p1_rad = np.deg2rad(df[phase_col])
+                        p2_rad = np.deg2rad(df_compare[phase_col])
+                        # Ensure magnitudes are numeric before complex calculation
+                        if pd.api.types.is_numeric_dtype(mag1) and pd.api.types.is_numeric_dtype(mag2):
+                            diff = np.abs((mag1 * np.exp(1j * p1_rad)) - (mag2 * np.exp(1j * p2_rad)))
+                        else:
+                            print(f"Skipping complex diff for '{col}': Non-numeric magnitude data.")
+                    except Exception as e:
+                        print(f"Error calculating complex difference for '{col}': {e}")
                 else:
-                    diff = np.abs(mag1 - mag2)
+                    # Fallback to magnitude difference only if phase columns aren't BOTH present
+                    try:
+                        if pd.api.types.is_numeric_dtype(mag1) and pd.api.types.is_numeric_dtype(mag2):
+                            diff = np.abs(mag1 - mag2)
+                        else:
+                            print(f"Skipping simple diff for '{col}': Non-numeric magnitude data.")
+                    except Exception as e:
+                        print(f"Error calculating simple difference for '{col}': {e}")
+
+            else:  # TIME domain
+                try:
+                    if pd.api.types.is_numeric_dtype(mag1) and pd.api.types.is_numeric_dtype(mag2):
+                        diff = np.abs(mag1 - mag2)
+                    else:
+                        print(f"Skipping time diff for '{col}': Non-numeric magnitude data.")
+                except Exception as e:
+                    print(f"Error calculating time difference for '{col}': {e}")
+
+            # Only add to dict if calculation was successful (not NaN)
+            if not pd.isna(diff).all():  # Check if the entire series is not NaN
+                diff_dict[f'Δ {col}'] = diff
             else:
-                diff = np.abs(mag1 - mag2)
-            
-            diff_dict[f'Δ {col}'] = diff
-        return pd.DataFrame(diff_dict)
+                print(f"Failed to calculate valid difference for '{col}'.")
+
+        # Return an empty DataFrame if no valid differences were calculated
+        return pd.DataFrame(diff_dict) if diff_dict else pd.DataFrame()
 
     # region Signal Slots
     @QtCore.pyqtSlot()
@@ -462,7 +521,16 @@ class PlotController(QtCore.QObject):
         except (ValueError, IndexError) as e:
             print(f"Could not update time domain representation plot: {e}")
             tab.display_plot(go.Figure())
-            
+
+    @QtCore.pyqtSlot()
+    def update_compare_column_list(self):
+        """
+        Fetches the common columns and tells the UI
+        to repopulate the compare_column_selector.
+        """
+        common_columns = self._get_common_columns()
+        self.main_window.tab_compare_data.update_column_selector(common_columns)
+
     @QtCore.pyqtSlot()
     def update_compare_data_plots(self):
         if self._get_df() is None or self._get_compare_df() is None: return
