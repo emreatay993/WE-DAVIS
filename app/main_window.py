@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
             super().keyPressEvent(event)
 
     def _setup_ui(self):
-        self.setWindowTitle("WE MechLoad Viewer")
+        self.setWindowTitle("WE-DAVIS")
         self.setMinimumSize(1200, 800)
         icon_path = os.path.join("resources", "icon.ico")
         if os.path.exists(icon_path): self.setWindowIcon(QIcon(icon_path))
@@ -175,11 +175,11 @@ class MainWindow(QMainWindow):
         num_folders = self.df['DataFolder'].nunique()
         if num_folders > 1:
             parent = os.path.basename(os.path.dirname(self.raw_data_folder))
-            title = f"WE MechLoad Viewer - (Directory: {parent} | {num_folders} Data Folders Loaded)"
+            title = f"WE-DAVIS - (Directory: {parent} | {num_folders} Data Folders Loaded)"
         else:
             parent = os.path.basename(os.path.dirname(self.raw_data_folder))
             selected = os.path.basename(self.raw_data_folder)
-            title = f"WE MechLoad Viewer - (Directory: {parent} | Data Folder: {selected})"
+            title = f"WE-DAVIS - (Directory: {parent} | Data Folder: {selected})"
         self.setWindowTitle(title)
 
         self.dock.set_root_path(self.raw_data_folder)
