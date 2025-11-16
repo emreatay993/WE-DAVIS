@@ -1,0 +1,418 @@
+TEST NO: 1
+TITLE: Application Launch and Initial Data Loading
+DESCRIPTION: Validates application startup and initial data folder selection with domain detection
+INPUTS:
+- Python 3.10+ installed with all dependencies from requirements.txt
+- Test data folder containing full.pld and max.pld files (both TIME and FREQ domain datasets available)
+- Application launched via python main.py
+TEST STEPS:
+1. Launch the application from repository root using python main.py
+2. Observe the folder selection dialog that appears
+3. Select a directory containing time-domain data folders (with TIME column in full.pld)
+4. Verify window title updates to "WE-DAVIS - (Directory: [parent] | Data Folder: [selected])"
+5. Observe which tabs are enabled (Single Data, Interface Data, Part Loads, Compare Data, Compare Data Part Loads, Settings)
+6. Verify Time Domain Rep tab is NOT visible for time-domain data
+7. Close application and relaunch
+8. This time select a directory containing frequency-domain data folders (with FREQ column)
+9. Verify Time Domain Rep tab IS visible for frequency-domain data
+10. Test canceling the initial folder dialog and verify application closes gracefully
+EXPECTED RESULTS:
+- Application window opens with title "WE-DAVIS" and minimum size 1200x800
+- Folder selection dialog appears on launch
+- Data loads successfully for both TIME and FREQ domains
+- Window title reflects loaded directory and folder information
+- Tabs enable/disable correctly based on data domain (Time Domain Rep only for FREQ data)
+- Time-domain specific features (spectrum, filtering) only visible for TIME data
+- Frequency-domain specific features (phase plots) only visible for FREQ data
+- Application icon displays in title bar if resources/icon.ico exists
+- Canceling initial dialog closes application without errors
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 2
+TITLE: Single Data Tab - Time Domain Analysis Features
+DESCRIPTION: Validates time-domain signal analysis including filtering, sectioning, spectrum analysis, and computed metrics
+INPUTS:
+- Time-domain dataset loaded (single folder with TIME column)
+- Single Data tab active
+- Test channel selected (e.g., force or displacement channel)
+- Cutoff frequency: 50 Hz
+- Filter order: 2
+- Section time range: Min 1.0 sec, Max 10.0 sec
+- Spectrum slices: 400
+- Plot types: Heatmap, Surface, Waterfall, Animation, Peak, Lines
+- Colorscales: Hot, Viridis, Plasma
+TEST STEPS:
+1. Navigate to Single Data tab
+2. Select a channel from the column selector dropdown
+3. Verify plot displays the selected channel vs TIME
+4. Check "Section Data" checkbox and verify Min/Max time inputs appear
+5. Enter Min Time: 1.0 and Max Time: 10.0, then observe plot updates to show only data between 1-10 seconds
+6. Check "Apply Low-Pass Filter" checkbox and verify Cutoff Freq and Order controls appear
+7. Enter Cutoff Freq: 50 and set Order: 2, then observe smoothed signal in plot
+8. Check "Show Spectrum Plot" checkbox and verify spectrum controls appear (Plot type, Colorscale, Spectrum Slices)
+9. Verify spectrum plot appears below main plot showing frequency content
+10. Change Plot type selector to "Heatmap" and verify heatmap visualization with colorscale selector visible
+11. Change Plot type to "Surface" and verify 3D surface plot with colorscale selector still visible
+12. Change Plot type to "Waterfall" and verify colorscale selector becomes hidden
+13. Test remaining plot types (Animation, Peak, Lines) and verify each renders correctly
+14. Change Colorscale from Hot to Viridis and verify spectrum colors update
+15. Change Spectrum Slices to 200, press Enter, and verify spectrum resolution changes
+16. Select "Time Step (Δt)" from column selector and verify computed time step plot displays
+17. Verify filter and spectrum controls are hidden for computed selections
+18. Select "Sampling Rate (Hz)" and verify computed sampling rate plot displays
+19. Return to regular channel and verify all controls become available again
+EXPECTED RESULTS:
+- All time-domain controls (Section, Filter, Spectrum) are visible and functional
+- Section Data limits plot to specified time range
+- Low-pass filter smooths the signal using Butterworth filter with specified parameters
+- Spectrum plot displays correctly for all plot types (Heatmap, Surface, Waterfall, Animation, Peak, Lines)
+- Colorscale selector is visible only for Heatmap and Surface types
+- Colorscale changes apply to spectrum visualization
+- Spectrum slices input controls frequency resolution
+- Computed options (Time Step, Sampling Rate) display correctly and hide filter/spectrum controls
+- Phase plot does NOT appear for time-domain data
+- All plots update responsively when parameters change
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 3
+TITLE: Single Data Tab - Frequency Domain Analysis with Phase
+DESCRIPTION: Validates frequency-domain signal analysis and automatic phase plot generation
+INPUTS:
+- Frequency-domain dataset loaded (single folder with FREQ column)
+- Single Data tab active
+- Test channel with corresponding Phase_ column
+TEST STEPS:
+1. Load a single folder containing frequency-domain data
+2. Navigate to Single Data tab
+3. Select a channel from the column selector dropdown
+4. Verify main plot displays amplitude vs FREQ
+5. Verify phase plot automatically appears below main plot showing Phase_ vs FREQ
+6. Verify time-domain controls (Section, Filter, Spectrum checkboxes) are NOT visible
+7. Verify computed options (Time Step, Sampling Rate) are NOT in column selector
+8. Select different channels and verify phase plot updates accordingly
+9. Close and load multiple frequency-domain folders
+10. Verify phase plot does NOT appear when multiple folders are loaded
+EXPECTED RESULTS:
+- Amplitude plot displays for selected channel vs FREQ
+- Phase plot automatically appears for single folder frequency-domain data
+- Phase plot shows corresponding Phase_ column data
+- Phase plot does NOT appear when multiple folders are loaded
+- Time-domain specific controls are hidden
+- Computed metric options are not available for frequency-domain data
+- Column selector only shows amplitude columns (not Phase_ columns)
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 4
+TITLE: Interface Data and Part Loads Tabs with ANSYS Export
+DESCRIPTION: Validates interface and part load visualization, filtering, sectioning, Tukey windowing, and ANSYS export functionality
+INPUTS:
+- Single time-domain or frequency-domain folder loaded
+- Interface Data and Part Loads tabs enabled
+- Interface: I1A (or available interface)
+- Side: Test side from data
+- Exclude T2/T3/R2/R3: Yes
+- Tukey alpha: 0.1 (for time-domain)
+- Section range: Min 2 sec, Max 8 sec (for time-domain)
+- ANSYS Mechanical installed with ansys-mechanical-core package
+TEST STEPS:
+1. Navigate to Interface Data tab
+2. Select an interface (e.g., I1A) from interface selector
+3. Verify T1/T2/T3/R1/R2/R3 component plots display for selected interface
+4. Select a side from side selector and verify plots filter to show only that side's channels
+5. Navigate to Part Loads tab
+6. Select a side from side filter selector
+7. Verify T-series (translational) and R-series (rotational) plots appear in split view
+8. Check "Filter out T2, T3, R2, and R3 from graphs" checkbox
+9. Verify plots update to exclude individual T2/T3/R2/R3 components but keep resultant channels
+10. For time-domain data: Check "Apply Tukey Window" and verify alpha spinbox appears
+11. Set Tukey alpha to 0.1 and verify plot updates with window taper applied
+12. For time-domain data: Check "Section Data" and enter Min Time: 2, Max Time: 8
+13. Verify plots display only data between 2-8 seconds
+14. Click "Extract Data" button and save CSV file
+15. Verify exported CSV contains currently displayed part loads data
+16. Click "Extract Part Loads as FEA Input (ANSYS)" button
+17. Select one or more sides in the dialog that appears
+18. For FREQ data: Verify harmonic response template is generated in ANSYS
+19. For TIME data: Verify transient template is generated in ANSYS with correct sampling rate
+20. Verify CSV files are created (original units and scaled by 1000)
+EXPECTED RESULTS:
+- Interface Data tab displays all six force/moment components for selected interface and side
+- Part Loads tab shows translational and rotational loads in separate plots
+- Exclude checkbox successfully filters out T2/T3/R2/R3 individual components
+- Tukey window applies tapered window to time-domain data edges
+- Section Data limits part loads to specified time range
+- Extract Data button exports current view to CSV successfully
+- ANSYS export generates appropriate templates based on domain type
+- Harmonic response template for frequency-domain with complex loads
+- Transient template for time-domain with correct time steps
+- Both tabs are disabled when multiple folders are loaded
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 5
+TITLE: Time Domain Representation Tab
+DESCRIPTION: Validates frequency-to-time domain reconstruction with interval sampling and CSV export
+INPUTS:
+- Single frequency-domain folder loaded (FREQ column and Phase_ columns present)
+- Time Domain Rep tab visible and enabled
+- Frequency selection: 10 Hz (or available frequency from data)
+- Interval angles: 1, 10, 30, 60, 90 degrees
+TEST STEPS:
+1. Load a single folder containing frequency-domain data
+2. Verify Time Domain Rep tab appears after Part Loads tab
+3. Navigate to Time Domain Rep tab
+4. Observe frequency selector dropdown contains all unique frequencies from FREQ column in sorted order
+5. Select a frequency value (e.g., 10 Hz) from the dropdown
+6. Verify time-domain reconstruction plot displays showing reconstructed waveforms using amplitude and phase
+7. Observe interval selector contains divisors of 360 (1, 2, 3, 4, 5, 6, 8, 9, 10, 12, etc.)
+8. Select interval: 10 degrees
+9. Verify plot updates showing sampled points at 10-degree increments
+10. Click "Extract Data at Each Interval as CSV file" button
+11. Choose save location and verify CSV file is created
+12. Open CSV and verify it contains time-sampled results at selected angular intervals
+13. Change interval to 30 degrees and verify plot shows coarser sampling
+14. Change interval to 1 degree and verify plot shows finer sampling
+15. Select different frequency and verify reconstruction updates for new frequency
+EXPECTED RESULTS:
+- Time Domain Rep tab only appears for frequency-domain data
+- Tab is enabled only when single folder is loaded
+- Frequency selector contains all available frequencies in sorted order
+- Selected frequency triggers time-domain reconstruction using amplitude and phase information
+- Reconstructed waveforms display as time traces
+- Interval selector contains only divisors of 360
+- Interval selection controls sampling density of exported points
+- Extract button generates CSV with time-sampled data at specified intervals
+- Plot updates dynamically when frequency or interval changes
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 6
+TITLE: Compare Data and Compare Part Loads Tabs
+DESCRIPTION: Validates comparison dataset loading, column matching, difference calculations, and part loads comparison
+INPUTS:
+- Primary dataset loaded (single folder, time or frequency domain)
+- Comparison dataset folder with matching domain type (TIME or FREQ)
+- Comparison dataset with mismatched domain for error testing
+- Common channel name present in both datasets
+- Side selection for part loads comparison
+TEST STEPS:
+1. Load primary dataset (single folder, either TIME or FREQ domain)
+2. Navigate to Compare Data tab
+3. Click "Select Data for Comparison" button
+4. Select a comparison folder with matching domain type
+5. Verify success message appears stating "Comparison data loaded successfully"
+6. Verify compare column selector is populated with only common columns between datasets
+7. Select a channel from compare column selector
+8. Verify top plot shows original and comparison traces overlaid
+9. Verify middle plot shows absolute difference (original minus comparison)
+10. Verify bottom plot shows relative percent difference
+11. Change selected column and verify all three plots update
+12. Navigate to Compare Data (Part Loads) tab
+13. Select a side from side filter selector
+14. Verify translational (T-series) difference plots display
+15. Verify rotational (R-series) difference plots display
+16. Check "Filter out T2, T3, R2, and R3 from graphs" checkbox
+17. Verify comparison plots update to exclude those components
+18. Click "Select Data for Comparison" again and load a folder with mismatched domain type
+19. Verify error dialog appears stating "Comparison data needs a 'TIME' (or 'FREQ') column"
+20. Verify comparison data is cleared and column selector is empty
+EXPECTED RESULTS:
+- Comparison data loads successfully for matching domain types
+- Column selector shows only columns present in both primary and comparison datasets
+- Overlay plot displays both traces with clear visual distinction
+- Absolute difference plot shows original - comparison values accurately
+- Relative difference plot shows percentage change correctly
+- Part loads comparison displays difference plots for T and R series
+- Exclude checkbox filters components in comparison view
+- Domain mismatch is rejected with clear error message
+- Comparison data is cleared after failed load attempt
+- Both compare tabs are disabled when multiple primary folders are loaded
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 7
+TITLE: Settings Tab - Graphical Controls and Data Processing
+DESCRIPTION: Validates all settings including rolling min-max envelope, plot styling, font sizes, hover modes, and trace opacity
+INPUTS:
+- Time-domain dataset for rolling min-max testing
+- Frequency-domain dataset for control state testing
+- At least one plot visible in any tab
+- Legend font size: 16
+- Default font size: 18
+- Hover font size: 12
+- Hover mode options: closest, x, y, x unified, y unified
+- Trace opacity: 0.0, 0.5, 1.0
+- Rolling min-max points: 10000
+TEST STEPS:
+1. Load time-domain dataset and navigate to Settings tab
+2. Verify "Show Plots as Rolling Min-Max Envelope" checkbox is enabled
+3. Check the Rolling Min-Max checkbox
+4. Verify "Plot as Bars" checkbox and "Number of Points Shown" input appear
+5. Navigate to Single Data tab and verify plots show envelope instead of raw traces
+6. Return to Settings tab and check "Plot as Bars" checkbox
+7. Verify plots update to use bar rendering style
+8. Change "Number of Points Shown" from 50000 to 10000
+9. Verify plots update to display only 10000 envelope points
+10. Load frequency-domain dataset and return to Settings tab
+11. Verify Rolling Min-Max checkbox is disabled and unchecked (FREQ data not supported)
+12. With plots visible, change Legend Font Size from 10 to 16
+13. Verify legend text size increases across all visible plots
+14. Change Default Font Size from 12 to 18
+15. Verify axis labels and titles update to size 18
+16. Change Hover Font Size from 15 to 12
+17. Hover over any plot point and verify tooltip text is smaller
+18. Change Hover Mode from "closest" to "x unified"
+19. Hover over plot and verify all traces at same x-value are highlighted
+20. Test other hover modes (x, y, y unified) and verify behavior changes accordingly
+21. Change Trace Opacity from 0.75 to 0.5
+22. Verify all traces across all tabs become more transparent
+23. Set Trace Opacity to 0.0 and verify traces become fully transparent
+24. Set Trace Opacity to 1.0 and verify traces become fully opaque
+EXPECTED RESULTS:
+- Rolling Min-Max envelope is only enabled for time-domain data
+- Rolling Min-Max checkbox reveals dependent controls (Plot as Bars, Number of Points)
+- Envelope calculation replaces raw traces with min-max bands
+- Plot as Bars changes rendering style to bar chart
+- Number of Points input controls envelope resolution
+- Rolling Min-Max is disabled and unchecked for frequency-domain data
+- Legend Font Size affects legend text across all plots
+- Default Font Size affects axis labels and plot titles
+- Hover Font Size affects tooltip text size
+- Hover Mode changes interaction behavior (closest, x, y, x unified, y unified)
+- Trace Opacity applies globally to all traces in all plots
+- Opacity range 0.0 (transparent) to 1.0 (opaque) works correctly
+- All settings changes apply in real-time across all tabs
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 8
+TITLE: Menu Operations and Data Export
+DESCRIPTION: Validates File menu operations including Open New Data, Export Full Data as CSV, and View menu dock toggle
+INPUTS:
+- Initial dataset loaded
+- Secondary dataset folder for reload testing
+- CSV export destination path
+TEST STEPS:
+1. Load initial dataset using python main.py folder selection
+2. Navigate to File menu and click "Open New Data"
+3. Select a different data folder
+4. Verify new data replaces current dataset
+5. Verify window title updates to reflect new data folder
+6. Verify all tabs refresh with new data selectors and plots
+7. Click File > "Export Full Data as CSV"
+8. Choose save location as "full_data_export.csv"
+9. Verify success message appears confirming export
+10. Open exported CSV file and verify all columns are present
+11. Verify "DataFolder" column exists showing source folder for each row
+12. Verify FREQ or TIME column is present based on domain type
+13. Verify Phase_ columns exist for frequency-domain exports
+14. Navigate to View menu and click "Data Folders"
+15. Verify directory dock toggles to hidden state
+16. Click View > "Data Folders" again and verify dock reappears
+17. With no data loaded, click File > "Export Full Data as CSV"
+18. Verify warning dialog appears: "Please load data first before exporting"
+EXPECTED RESULTS:
+- Open New Data successfully replaces current dataset
+- Window title updates to reflect newly loaded data
+- All tab selectors repopulate with new data columns
+- Export Full Data as CSV generates complete CSV file
+- Exported CSV includes all columns including DataFolder tag for traceability
+- Domain column (TIME or FREQ) is present
+- Phase columns are included for frequency-domain data
+- View > Data Folders toggles dock visibility on/off
+- Export without data loaded shows appropriate warning message
+- Export operation does not crash or produce corrupted files
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 9
+TITLE: Keyboard Shortcuts and Window Management
+DESCRIPTION: Validates keyboard shortcuts for legend control and window behavior including title updates and resizing
+INPUTS:
+- Dataset loaded with plots visible
+- Window resize testing
+TEST STEPS:
+1. Load any dataset and ensure plots are visible in any tab
+2. Press K key on keyboard
+3. Verify legend position cycles to next corner (e.g., top-right to top-left)
+4. Press K key multiple times and verify legend cycles through all positions
+5. Press L key on keyboard
+6. Verify legend visibility toggles off (legend disappears)
+7. Press L key again and verify legend reappears
+8. Press K key while legend is hidden and verify position cycles but legend stays hidden until L is pressed
+9. Load single folder and verify window title shows "WE-DAVIS - (Directory: [parent] | Data Folder: [selected])"
+10. Load multiple folders from directory dock and verify title shows "WE-DAVIS - (Directory: [parent] | X Data Folders Loaded)"
+11. Resize application window to smaller size (e.g., 800x600)
+12. Verify plots adjust and remain visible within window bounds
+13. Resize window to larger size (e.g., 1600x1000)
+14. Verify plots expand to fill available space
+15. Verify splitters between plots can be dragged to adjust relative sizes
+16. Minimize and restore window and verify plots render correctly
+EXPECTED RESULTS:
+- K key cycles legend position through available corners
+- L key toggles legend visibility on/off
+- Keyboard shortcuts work globally across all tabs
+- Window title accurately reflects single folder: "WE-DAVIS - (Directory: parent | Data Folder: name)"
+- Window title accurately reflects multiple folders: "WE-DAVIS - (Directory: parent | X Data Folders Loaded)"
+- Window resizes smoothly without crashes
+- Plots adjust to window size changes and remain visible
+- Splitters between plots are draggable
+- Minimum window size of 1200x800 is enforced
+- Application icon displays in title bar and taskbar if icon.ico exists
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 10
+TITLE: Directory Dock and Multi-Folder Operations
+DESCRIPTION: Validates directory tree dock for folder selection, multi-folder merging, and DataFolder provenance tracking
+INPUTS:
+- Parent directory containing multiple data folders (3+ folders)
+- Each folder containing full.pld and max.pld files
+- All folders with same domain type (TIME or FREQ)
+TEST STEPS:
+1. Load initial dataset by selecting parent directory
+2. Verify directory dock appears on left side showing folder tree
+3. Expand folders in directory tree and verify subfolders are visible
+4. Check checkbox next to a single folder in the dock
+5. Verify selected folder loads and window title shows single folder name
+6. Verify tabs that require single folder context are enabled (Interface Data, Part Loads)
+7. Check same folder again and verify no reload occurs (optimization check)
+8. Check checkboxes next to two additional folders (total 3 folders selected)
+9. Verify data from all three folders merges into single dataset
+10. Verify window title updates to show "3 Data Folders Loaded"
+11. Verify tabs requiring single folder are disabled (Interface Data, Part Loads, Compare Data)
+12. Navigate to Single Data tab and select a channel
+13. Verify plot shows overlaid traces from all three folders with different colors/names
+14. Export full data as CSV
+15. Open CSV and verify "DataFolder" column shows source folder for each row
+16. Verify each folder's data is distinguishable by DataFolder tag
+17. Uncheck all folders and check only one folder
+18. Verify single-folder tabs become enabled again
+19. Attempt to check folders with mismatched domains (TIME + FREQ)
+20. Verify error message appears rejecting mixed domain folders
+EXPECTED RESULTS:
+- Directory dock displays folder tree of selected parent directory
+- Single folder selection loads that folder and enables all tabs
+- Reselecting same folder does not trigger unnecessary reload
+- Multiple folder selection merges all data into single DataFrame
+- Window title shows folder count for multiple folders
+- Single-folder-only tabs (Interface Data, Part Loads, Compare Data, Time Domain Rep) are disabled with multiple folders
+- Single Data tab overlays traces from all folders
+- DataFolder column preserves provenance in merged dataset
+- Each row is tagged with originating folder name
+- Mixed domain folders (TIME + FREQ) are rejected with error
+- Dock can be hidden/shown via View menu
+REQUIREMENT NO: N/A
+

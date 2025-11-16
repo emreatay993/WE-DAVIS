@@ -1,0 +1,418 @@
+TEST NO: 1
+TITLE: Uygulama Başlatma ve İlk Veri Yükleme
+DESCRIPTION: Uygulama başlangıcını ve domain tespiti ile ilk veri klasörü seçimini doğrular
+INPUTS:
+- Python 3.10+ ve requirements.txt dosyasındaki tüm bağımlılıklar yüklenmiş
+- full.pld ve max.pld dosyalarını içeren test veri klasörü (hem TIME hem de FREQ domain veri setleri mevcut)
+- Uygulama python main.py komutu ile başlatılmış
+TEST STEPS:
+1. Uygulamayı repository root dizininden python main.py komutu ile başlatın
+2. Açılan klasör seçim dialogunu gözlemleyin
+3. Time-domain veri klasörleri içeren bir dizin seçin (full.pld içinde TIME kolonu olan)
+4. Pencere başlığının "WE-DAVIS - (Directory: [parent] | Data Folder: [selected])" şeklinde güncellendiğini doğrulayın
+5. Hangi sekmeler etkin hale geldi gözlemleyin (Single Data, Interface Data, Part Loads, Compare Data, Compare Data Part Loads, Settings)
+6. Time Domain Rep sekmesinin time-domain veri için GÖRÜNMEDİĞİNİ doğrulayın
+7. Uygulamayı kapatın ve yeniden başlatın
+8. Bu sefer frequency-domain veri klasörleri içeren bir dizin seçin (FREQ kolonu olan)
+9. Time Domain Rep sekmesinin frequency-domain veri için GÖRÜNÜR olduğunu doğrulayın
+10. İlk klasör dialogunu iptal edin ve uygulamanın sorunsuz kapandığını doğrulayın
+EXPECTED RESULTS:
+- Uygulama penceresi "WE-DAVIS" başlığı ve minimum 1200x800 boyutu ile açılır
+- Başlangıçta klasör seçim dialogu görünür
+- Hem TIME hem de FREQ domain verileri başarıyla yüklenir
+- Pencere başlığı yüklenen dizin ve klasör bilgilerini yansıtır
+- Sekmeler veri domain'ine göre doğru şekilde etkin/pasif olur (Time Domain Rep sadece FREQ verisi için)
+- Time-domain'e özel özellikler (spectrum, filtering) sadece TIME verisi için görünür
+- Frequency-domain'e özel özellikler (phase plots) sadece FREQ verisi için görünür
+- resources/icon.ico dosyası varsa uygulama ikonu başlık çubuğunda görüntülenir
+- İlk dialogu iptal etmek uygulamayı hatasız kapatır
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 2
+TITLE: Single Data Tab - Time Domain Analiz Özellikleri
+DESCRIPTION: Time-domain sinyal analizini filtering, sectioning, spectrum analizi ve hesaplanmış metrikler dahil olmak üzere doğrular
+INPUTS:
+- Time-domain veri seti yüklenmiş (TIME kolonlu tek klasör)
+- Single Data tab aktif
+- Test kanalı seçili (örn. force veya displacement kanalı)
+- Cutoff frequency: 50 Hz
+- Filter order: 2
+- Section time range: Min 1.0 sec, Max 10.0 sec
+- Spectrum slices: 400
+- Plot types: Heatmap, Surface, Waterfall, Animation, Peak, Lines
+- Colorscales: Hot, Viridis, Plasma
+TEST STEPS:
+1. Single Data tab'ına gidin
+2. Column selector dropdown'ından bir kanal seçin
+3. Grafiğin seçilen kanalı TIME'a karşı gösterdiğini doğrulayın
+4. "Section Data" checkbox'ını işaretleyin ve Min/Max time input alanlarının göründüğünü doğrulayın
+5. Min Time: 1.0 ve Max Time: 10.0 girin, ardından grafiğin sadece 1-10 saniye arasındaki veriyi gösterecek şekilde güncellendiğini gözlemleyin
+6. "Apply Low-Pass Filter" checkbox'ını işaretleyin ve Cutoff Freq ile Order kontrollerinin göründüğünü doğrulayın
+7. Cutoff Freq: 50 girin ve Order: 2 ayarlayın, ardından grafikte düzleştirilmiş sinyali gözlemleyin
+8. "Show Spectrum Plot" checkbox'ını işaretleyin ve spectrum kontrollerinin göründüğünü doğrulayın (Plot type, Colorscale, Spectrum Slices)
+9. Ana grafiğin altında frekans içeriğini gösteren spectrum grafiğinin göründüğünü doğrulayın
+10. Plot type selector'ı "Heatmap"e değiştirin ve colorscale selector'ın görünür olduğu heatmap görselleştirmesini doğrulayın
+11. Plot type'ı "Surface"e değiştirin ve colorscale selector'ın hala görünür olduğu 3D surface grafiğini doğrulayın
+12. Plot type'ı "Waterfall"a değiştirin ve colorscale selector'ın gizlendiğini doğrulayın
+13. Kalan plot type'ları test edin (Animation, Peak, Lines) ve her birinin doğru render edildiğini doğrulayın
+14. Colorscale'i Hot'tan Viridis'e değiştirin ve spectrum renklerinin güncellendiğini doğrulayın
+15. Spectrum Slices değerini 200'e değiştirin, Enter'a basın ve spectrum çözünürlüğünün değiştiğini doğrulayın
+16. Column selector'dan "Time Step (Δt)" seçin ve hesaplanmış time step grafiğinin göründüğünü doğrulayın
+17. Hesaplanmış seçimler için filter ve spectrum kontrollerinin gizlendiğini doğrulayın
+18. "Sampling Rate (Hz)" seçin ve hesaplanmış sampling rate grafiğinin göründüğünü doğrulayın
+19. Normal bir kanala geri dönün ve tüm kontrollerin tekrar kullanılabilir hale geldiğini doğrulayın
+EXPECTED RESULTS:
+- Tüm time-domain kontrolleri (Section, Filter, Spectrum) görünür ve fonksiyoneldir
+- Section Data grafiği belirtilen zaman aralığı ile sınırlar
+- Low-pass filter sinyali belirtilen parametrelerle Butterworth filtresi kullanarak düzleştirir
+- Spectrum grafiği tüm plot type'lar için doğru görüntülenir (Heatmap, Surface, Waterfall, Animation, Peak, Lines)
+- Colorscale selector sadece Heatmap ve Surface type'lar için görünür
+- Colorscale değişiklikleri spectrum görselleştirmesine uygulanır
+- Spectrum slices input frekans çözünürlüğünü kontrol eder
+- Hesaplanmış seçenekler (Time Step, Sampling Rate) doğru görüntülenir ve filter/spectrum kontrollerini gizler
+- Time-domain verisi için phase plot GÖRÜNMEZ
+- Parametreler değiştiğinde tüm grafikler duyarlı şekilde güncellenir
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 3
+TITLE: Single Data Tab - Frequency Domain Analizi ve Phase Grafiği
+DESCRIPTION: Frequency-domain sinyal analizini ve otomatik phase plot oluşturmayı doğrular
+INPUTS:
+- Frequency-domain veri seti yüklenmiş (FREQ kolonlu tek klasör)
+- Single Data tab aktif
+- Karşılık gelen Phase_ kolonu olan test kanalı
+TEST STEPS:
+1. Frequency-domain verisi içeren tek bir klasör yükleyin
+2. Single Data tab'ına gidin
+3. Column selector dropdown'ından bir kanal seçin
+4. Ana grafiğin amplitude'u FREQ'e karşı gösterdiğini doğrulayın
+5. Phase grafiğinin otomatik olarak ana grafiğin altında Phase_ vs FREQ göstererek göründüğünü doğrulayın
+6. Time-domain kontrollerinin (Section, Filter, Spectrum checkbox'ları) GÖRÜNÜR olmadığını doğrulayın
+7. Hesaplanmış seçeneklerin (Time Step, Sampling Rate) column selector'da OLMADIĞINI doğrulayın
+8. Farklı kanallar seçin ve phase grafiğinin buna göre güncellendiğini doğrulayın
+9. Uygulamayı kapatın ve birden fazla frequency-domain klasörü yükleyin
+10. Birden fazla klasör yüklendiğinde phase grafiğinin GÖRÜNMEZ olduğunu doğrulayın
+EXPECTED RESULTS:
+- Seçilen kanal için amplitude grafiği FREQ'e karşı gösterilir
+- Tek klasör frequency-domain verisi için phase grafiği otomatik olarak görünür
+- Phase grafiği karşılık gelen Phase_ kolonu verisini gösterir
+- Birden fazla klasör yüklendiğinde phase grafiği GÖRÜNMEZ
+- Time-domain'e özel kontroller gizlidir
+- Hesaplanmış metrik seçenekleri frequency-domain verisi için mevcut değildir
+- Column selector sadece amplitude kolonlarını gösterir (Phase_ kolonları değil)
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 4
+TITLE: Interface Data ve Part Loads Sekmeleri ile ANSYS Export
+DESCRIPTION: Interface ve part load görselleştirmesini, filtrelemeyi, sectioning'i, Tukey windowing'i ve ANSYS export fonksiyonelliğini doğrular
+INPUTS:
+- Tek time-domain veya frequency-domain klasör yüklenmiş
+- Interface Data ve Part Loads sekmeleri etkin
+- Interface: I1A (veya mevcut interface)
+- Side: Veriden test side
+- Exclude T2/T3/R2/R3: Evet
+- Tukey alpha: 0.1 (time-domain için)
+- Section range: Min 2 sec, Max 8 sec (time-domain için)
+- ANSYS Mechanical ve ansys-mechanical-core paketi yüklü
+TEST STEPS:
+1. Interface Data tab'ına gidin
+2. Interface selector'dan bir interface seçin (örn. I1A)
+3. Seçilen interface için T1/T2/T3/R1/R2/R3 bileşen grafiklerinin göründüğünü doğrulayın
+4. Side selector'dan bir side seçin ve grafiklerin sadece o side'ın kanallarını gösterecek şekilde filtrelendiğini doğrulayın
+5. Part Loads tab'ına gidin
+6. Side filter selector'dan bir side seçin
+7. Bölünmüş görünümde T-series (translational) ve R-series (rotational) grafiklerinin göründüğünü doğrulayın
+8. "Filter out T2, T3, R2, and R3 from graphs" checkbox'ını işaretleyin
+9. Grafiklerin T2/T3/R2/R3 bireysel bileşenlerini hariç tutacak ancak resultant kanalları tutacak şekilde güncellendiğini doğrulayın
+10. Time-domain verisi için: "Apply Tukey Window" işaretleyin ve alpha spinbox'ının göründüğünü doğrulayın
+11. Tukey alpha'yı 0.1'e ayarlayın ve grafiğin window taper uygulanarak güncellendiğini doğrulayın
+12. Time-domain verisi için: "Section Data" işaretleyin ve Min Time: 2, Max Time: 8 girin
+13. Grafiklerin sadece 2-8 saniye arasındaki veriyi gösterdiğini doğrulayın
+14. "Extract Data" butonuna tıklayın ve CSV dosyasını kaydedin
+15. Dışa aktarılan CSV'nin şu anda görüntülenen part loads verisini içerdiğini doğrulayın
+16. "Extract Part Loads as FEA Input (ANSYS)" butonuna tıklayın
+17. Görünen dialogda bir veya daha fazla side seçin
+18. FREQ verisi için: ANSYS'de harmonic response template'inin oluşturulduğunu doğrulayın
+19. TIME verisi için: ANSYS'de doğru sampling rate ile transient template'inin oluşturulduğunu doğrulayın
+20. CSV dosyalarının oluşturulduğunu doğrulayın (orijinal birimler ve 1000 ile ölçeklenmiş)
+EXPECTED RESULTS:
+- Interface Data tab seçilen interface ve side için altı force/moment bileşenini gösterir
+- Part Loads tab translational ve rotational yükleri ayrı grafiklerde gösterir
+- Exclude checkbox T2/T3/R2/R3 bireysel bileşenlerini başarıyla filtreler
+- Tukey window time-domain verisi kenarlarına tapered window uygular
+- Section Data part loads'u belirtilen zaman aralığı ile sınırlar
+- Extract Data butonu mevcut görünümü başarıyla CSV'ye aktarır
+- ANSYS export domain tipine göre uygun template'leri oluşturur
+- Frequency-domain için complex load'lar ile harmonic response template
+- Time-domain için doğru time step'ler ile transient template
+- Birden fazla klasör yüklendiğinde her iki sekme de devre dışı kalır
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 5
+TITLE: Time Domain Representation Tab
+DESCRIPTION: Frequency-to-time domain dönüşümünü interval sampling ve CSV export ile doğrular
+INPUTS:
+- Tek frequency-domain klasör yüklenmiş (FREQ kolonu ve Phase_ kolonları mevcut)
+- Time Domain Rep tab görünür ve etkin
+- Frequency seçimi: 10 Hz (veya veriden mevcut frekans)
+- Interval açıları: 1, 10, 30, 60, 90 derece
+TEST STEPS:
+1. Frequency-domain verisi içeren tek bir klasör yükleyin
+2. Time Domain Rep tab'ının Part Loads tab'ından sonra göründüğünü doğrulayın
+3. Time Domain Rep tab'ına gidin
+4. Frequency selector dropdown'ının FREQ kolonundan tüm benzersiz frekansları sıralı şekilde içerdiğini gözlemleyin
+5. Dropdown'dan bir frekans değeri seçin (örn. 10 Hz)
+6. Time-domain reconstruction grafiğinin amplitude ve phase kullanarak yeniden oluşturulmuş dalga formlarını gösterdiğini doğrulayın
+7. Interval selector'ın 360'ın bölenlerini içerdiğini gözlemleyin (1, 2, 3, 4, 5, 6, 8, 9, 10, 12, vb.)
+8. Interval seçin: 10 derece
+9. Grafiğin 10 derecelik artışlarla örneklenmiş noktaları gösterecek şekilde güncellendiğini doğrulayın
+10. "Extract Data at Each Interval as CSV file" butonuna tıklayın
+11. Kaydetme konumu seçin ve CSV dosyasının oluşturulduğunu doğrulayın
+12. CSV'yi açın ve seçilen açısal aralıklarda time-sampled sonuçları içerdiğini doğrulayın
+13. Interval'i 30 dereceye değiştirin ve grafiğin daha kaba örnekleme gösterdiğini doğrulayın
+14. Interval'i 1 dereceye değiştirin ve grafiğin daha ince örnekleme gösterdiğini doğrulayın
+15. Farklı bir frekans seçin ve reconstruction'ın yeni frekans için güncellendiğini doğrulayın
+EXPECTED RESULTS:
+- Time Domain Rep tab sadece frequency-domain verisi için görünür
+- Tab sadece tek klasör yüklendiğinde etkindir
+- Frequency selector tüm mevcut frekansları sıralı olarak içerir
+- Seçilen frekans amplitude ve phase bilgilerini kullanarak time-domain reconstruction tetikler
+- Yeniden oluşturulmuş dalga formları time trace'ler olarak gösterilir
+- Interval selector sadece 360'ın bölenlerini içerir
+- Interval seçimi dışa aktarılan noktaların örnekleme yoğunluğunu kontrol eder
+- Extract butonu belirtilen aralıklarda time-sampled veri ile CSV oluşturur
+- Frekans veya interval değiştiğinde grafik dinamik olarak güncellenir
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 6
+TITLE: Compare Data ve Compare Part Loads Sekmeleri
+DESCRIPTION: Karşılaştırma veri seti yüklemeyi, kolon eşleştirmesini, fark hesaplamalarını ve part loads karşılaştırmasını doğrular
+INPUTS:
+- Birincil veri seti yüklenmiş (tek klasör, time veya frequency domain)
+- Eşleşen domain tipi ile karşılaştırma veri seti klasörü (TIME veya FREQ)
+- Hata testi için uyuşmayan domain ile karşılaştırma veri seti
+- Her iki veri setinde de mevcut ortak kanal adı
+- Part loads karşılaştırması için side seçimi
+TEST STEPS:
+1. Birincil veri setini yükleyin (tek klasör, TIME veya FREQ domain)
+2. Compare Data tab'ına gidin
+3. "Select Data for Comparison" butonuna tıklayın
+4. Eşleşen domain tipine sahip bir karşılaştırma klasörü seçin
+5. "Comparison data loaded successfully" başarı mesajının göründüğünü doğrulayın
+6. Compare column selector'ın sadece veri setleri arasındaki ortak kolonlarla doldurulduğunu doğrulayın
+7. Compare column selector'dan bir kanal seçin
+8. Üst grafiğin orijinal ve karşılaştırma trace'lerini üst üste gösterdiğini doğrulayın
+9. Orta grafiğin absolute difference'ı (orijinal eksi karşılaştırma) gösterdiğini doğrulayın
+10. Alt grafiğin relative percent difference'ı gösterdiğini doğrulayın
+11. Seçilen kolonu değiştirin ve üç grafiğin de güncellendiğini doğrulayın
+12. Compare Data (Part Loads) tab'ına gidin
+13. Side filter selector'dan bir side seçin
+14. Translational (T-series) difference grafiklerinin göründüğünü doğrulayın
+15. Rotational (R-series) difference grafiklerinin göründüğünü doğrulayın
+16. "Filter out T2, T3, R2, and R3 from graphs" checkbox'ını işaretleyin
+17. Karşılaştırma grafiklerinin bu bileşenleri hariç tutacak şekilde güncellendiğini doğrulayın
+18. Tekrar "Select Data for Comparison"a tıklayın ve uyuşmayan domain tipine sahip bir klasör yükleyin
+19. "Comparison data needs a 'TIME' (or 'FREQ') column" hata dialogunun göründüğünü doğrulayın
+20. Karşılaştırma verisinin temizlendiğini ve column selector'ın boş olduğunu doğrulayın
+EXPECTED RESULTS:
+- Eşleşen domain tipleri için karşılaştırma verisi başarıyla yüklenir
+- Column selector sadece hem birincil hem de karşılaştırma veri setlerinde mevcut olan kolonları gösterir
+- Overlay grafiği her iki trace'i net görsel ayrım ile gösterir
+- Absolute difference grafiği orijinal - karşılaştırma değerlerini doğru şekilde gösterir
+- Relative difference grafiği yüzde değişimini doğru şekilde gösterir
+- Part loads karşılaştırması T ve R serileri için difference grafiklerini gösterir
+- Exclude checkbox karşılaştırma görünümünde bileşenleri filtreler
+- Domain uyumsuzluğu net hata mesajı ile reddedilir
+- Başarısız yükleme denemesinden sonra karşılaştırma verisi temizlenir
+- Birden fazla birincil klasör yüklendiğinde her iki karşılaştırma sekmesi de devre dışı kalır
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 7
+TITLE: Settings Tab - Grafiksel Kontroller ve Veri İşleme
+DESCRIPTION: Rolling min-max envelope, plot styling, font boyutları, hover modları ve trace opacity dahil tüm ayarları doğrular
+INPUTS:
+- Rolling min-max testi için time-domain veri seti
+- Kontrol durumu testi için frequency-domain veri seti
+- Herhangi bir sekmede en az bir grafik görünür
+- Legend font size: 16
+- Default font size: 18
+- Hover font size: 12
+- Hover mode seçenekleri: closest, x, y, x unified, y unified
+- Trace opacity: 0.0, 0.5, 1.0
+- Rolling min-max points: 10000
+TEST STEPS:
+1. Time-domain veri setini yükleyin ve Settings tab'ına gidin
+2. "Show Plots as Rolling Min-Max Envelope" checkbox'ının etkin olduğunu doğrulayın
+3. Rolling Min-Max checkbox'ını işaretleyin
+4. "Plot as Bars" checkbox ve "Number of Points Shown" input'unun göründüğünü doğrulayın
+5. Single Data tab'ına gidin ve grafiklerin ham trace'ler yerine envelope gösterdiğini doğrulayın
+6. Settings tab'ına dönün ve "Plot as Bars" checkbox'ını işaretleyin
+7. Grafiklerin bar rendering stilini kullanacak şekilde güncellendiğini doğrulayın
+8. "Number of Points Shown" değerini 50000'den 10000'e değiştirin
+9. Grafiklerin sadece 10000 envelope noktası gösterecek şekilde güncellendiğini doğrulayın
+10. Frequency-domain veri setini yükleyin ve Settings tab'ına dönün
+11. Rolling Min-Max checkbox'ının devre dışı ve işaretsiz olduğunu doğrulayın (FREQ verisi desteklenmez)
+12. Grafikler görünürken, Legend Font Size'ı 10'dan 16'ya değiştirin
+13. Tüm görünür grafiklerde legend metin boyutunun arttığını doğrulayın
+14. Default Font Size'ı 12'den 18'e değiştirin
+15. Eksen etiketleri ve başlıkların boyut 18'e güncellendiğini doğrulayın
+16. Hover Font Size'ı 15'ten 12'ye değiştirin
+17. Herhangi bir grafik noktasının üzerine gelin ve tooltip metninin daha küçük olduğunu doğrulayın
+18. Hover Mode'u "closest"tan "x unified"a değiştirin
+19. Grafiğin üzerine gelin ve aynı x-değerindeki tüm trace'lerin vurgulandığını doğrulayın
+20. Diğer hover mode'ları test edin (x, y, y unified) ve davranışın buna göre değiştiğini doğrulayın
+21. Trace Opacity'yi 0.75'ten 0.5'e değiştirin
+22. Tüm sekmelerdeki tüm trace'lerin daha şeffaf hale geldiğini doğrulayın
+23. Trace Opacity'yi 0.0'a ayarlayın ve trace'lerin tamamen şeffaf hale geldiğini doğrulayın
+24. Trace Opacity'yi 1.0'a ayarlayın ve trace'lerin tamamen opak hale geldiğini doğrulayın
+EXPECTED RESULTS:
+- Rolling Min-Max envelope sadece time-domain verisi için etkindir
+- Rolling Min-Max checkbox bağımlı kontrolleri gösterir (Plot as Bars, Number of Points)
+- Envelope hesaplaması ham trace'leri min-max bantları ile değiştirir
+- Plot as Bars rendering stilini bar chart'a değiştirir
+- Number of Points input envelope çözünürlüğünü kontrol eder
+- Rolling Min-Max frequency-domain verisi için devre dışı ve işaretsizdir
+- Legend Font Size tüm grafiklerde legend metnini etkiler
+- Default Font Size eksen etiketlerini ve grafik başlıklarını etkiler
+- Hover Font Size tooltip metin boyutunu etkiler
+- Hover Mode etkileşim davranışını değiştirir (closest, x, y, x unified, y unified)
+- Trace Opacity tüm grafiklerdeki tüm trace'lere global olarak uygulanır
+- Opacity aralığı 0.0 (şeffaf) ile 1.0 (opak) doğru çalışır
+- Tüm ayar değişiklikleri tüm sekmelerde gerçek zamanlı olarak uygulanır
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 8
+TITLE: Menu İşlemleri ve Veri Export
+DESCRIPTION: Open New Data, Export Full Data as CSV içeren File menü işlemlerini ve View menü dock toggle'ı doğrular
+INPUTS:
+- İlk veri seti yüklenmiş
+- Yeniden yükleme testi için ikincil veri seti klasörü
+- CSV export hedef yolu
+TEST STEPS:
+1. python main.py klasör seçimi kullanarak ilk veri setini yükleyin
+2. File menüsüne gidin ve "Open New Data"ya tıklayın
+3. Farklı bir veri klasörü seçin
+4. Yeni verinin mevcut veri setini değiştirdiğini doğrulayın
+5. Pencere başlığının yeni veri klasörünü yansıtacak şekilde güncellendiğini doğrulayın
+6. Tüm sekmelerin yeni veri selector'ları ve grafikleri ile yenilendiğini doğrulayın
+7. File > "Export Full Data as CSV"ye tıklayın
+8. Kaydetme konumu olarak "full_data_export.csv" seçin
+9. Export'u onaylayan başarı mesajının göründüğünü doğrulayın
+10. Dışa aktarılan CSV dosyasını açın ve tüm kolonların mevcut olduğunu doğrulayın
+11. Her satır için kaynak klasörü gösteren "DataFolder" kolonunun bulunduğunu doğrulayın
+12. Domain tipine göre FREQ veya TIME kolonunun mevcut olduğunu doğrulayın
+13. Frequency-domain export'lar için Phase_ kolonlarının bulunduğunu doğrulayın
+14. View menüsüne gidin ve "Data Folders"a tıklayın
+15. Directory dock'ın gizli duruma geçtiğini doğrulayın
+16. View > "Data Folders"a tekrar tıklayın ve dock'ın yeniden göründüğünü doğrulayın
+17. Veri yüklü değilken File > "Export Full Data as CSV"ye tıklayın
+18. "Please load data first before exporting" uyarı dialogunun göründüğünü doğrulayın
+EXPECTED RESULTS:
+- Open New Data mevcut veri setini başarıyla değiştirir
+- Pencere başlığı yeni yüklenen veriyi yansıtacak şekilde güncellenir
+- Tüm sekme selector'ları yeni veri kolonları ile yeniden doldurulur
+- Export Full Data as CSV tam CSV dosyası oluşturur
+- Dışa aktarılan CSV izlenebilirlik için DataFolder etiketi dahil tüm kolonları içerir
+- Domain kolonu (TIME veya FREQ) mevcuttur
+- Frequency-domain verisi için phase kolonları dahil edilir
+- View > Data Folders dock görünürlüğünü açıp kapatır
+- Veri yüklü olmadan export uygun uyarı mesajını gösterir
+- Export işlemi çökmez veya bozuk dosyalar üretmez
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 9
+TITLE: Klavye Kısayolları ve Pencere Yönetimi
+DESCRIPTION: Legend kontrolü için klavye kısayollarını ve başlık güncellemeleri ile yeniden boyutlandırma dahil pencere davranışını doğrular
+INPUTS:
+- Grafikler görünür şekilde veri seti yüklenmiş
+- Pencere yeniden boyutlandırma testi
+TEST STEPS:
+1. Herhangi bir veri seti yükleyin ve herhangi bir sekmede grafiklerin görünür olduğundan emin olun
+2. Klavyede K tuşuna basın
+3. Legend pozisyonunun bir sonraki köşeye geçtiğini doğrulayın (örn. sağ üst'ten sol üst'e)
+4. K tuşuna birden fazla kez basın ve legend'ın tüm pozisyonlar arasında döngü yaptığını doğrulayın
+5. Klavyede L tuşuna basın
+6. Legend görünürlüğünün kapandığını doğrulayın (legend kaybolur)
+7. L tuşuna tekrar basın ve legend'ın yeniden göründüğünü doğrulayın
+8. Legend gizliyken K tuşuna basın ve pozisyonun döngü yaptığını ancak L basılana kadar legend'ın gizli kaldığını doğrulayın
+9. Tek klasör yükleyin ve pencere başlığının "WE-DAVIS - (Directory: [parent] | Data Folder: [selected])" şeklinde olduğunu doğrulayın
+10. Directory dock'tan birden fazla klasör yükleyin ve başlığın "WE-DAVIS - (Directory: [parent] | X Data Folders Loaded)" şeklinde olduğunu doğrulayın
+11. Uygulama penceresini daha küçük boyuta yeniden boyutlandırın (örn. 800x600)
+12. Grafiklerin ayarlandığını ve pencere sınırları içinde görünür kaldığını doğrulayın
+13. Pencereyi daha büyük boyuta yeniden boyutlandırın (örn. 1600x1000)
+14. Grafiklerin mevcut alanı dolduracak şekilde genişlediğini doğrulayın
+15. Grafikler arasındaki splitter'ların göreli boyutları ayarlamak için sürüklenebileceğini doğrulayın
+16. Pencereyi küçültün ve geri yükleyin ve grafiklerin doğru şekilde render edildiğini doğrulayın
+EXPECTED RESULTS:
+- K tuşu legend pozisyonunu mevcut köşeler arasında döngü yaptırır
+- L tuşu legend görünürlüğünü açıp kapatır
+- Klavye kısayolları tüm sekmelerde global olarak çalışır
+- Pencere başlığı tek klasörü doğru yansıtır: "WE-DAVIS - (Directory: parent | Data Folder: name)"
+- Pencere başlığı birden fazla klasörü doğru yansıtır: "WE-DAVIS - (Directory: parent | X Data Folders Loaded)"
+- Pencere çökmeden sorunsuz yeniden boyutlandırılır
+- Grafikler pencere boyutu değişikliklerine uyum sağlar ve görünür kalır
+- Grafikler arasındaki splitter'lar sürüklenebilir
+- Minimum 1200x800 pencere boyutu zorlanır
+- icon.ico mevcutsa uygulama ikonu başlık çubuğunda ve görev çubuğunda gösterilir
+REQUIREMENT NO: N/A
+
+---
+
+TEST NO: 10
+TITLE: Directory Dock ve Çoklu Klasör İşlemleri
+DESCRIPTION: Klasör seçimi, çoklu klasör birleştirme ve DataFolder provenance takibi için directory tree dock'ı doğrular
+INPUTS:
+- Birden fazla veri klasörü içeren parent dizin (3+ klasör)
+- Her klasörde full.pld ve max.pld dosyaları mevcut
+- Tüm klasörler aynı domain tipine sahip (TIME veya FREQ)
+TEST STEPS:
+1. Parent dizini seçerek ilk veri setini yükleyin
+2. Sol tarafta klasör ağacını gösteren directory dock'ın göründüğünü doğrulayın
+3. Directory tree'deki klasörleri genişletin ve alt klasörlerin görünür olduğunu doğrulayın
+4. Dock'taki tek bir klasörün yanındaki checkbox'ı işaretleyin
+5. Seçilen klasörün yüklendiğini ve pencere başlığının tek klasör adını gösterdiğini doğrulayın
+6. Tek klasör bağlamı gerektiren sekmelerin etkin olduğunu doğrulayın (Interface Data, Part Loads)
+7. Aynı klasörü tekrar işaretleyin ve yeniden yükleme olmadığını doğrulayın (optimizasyon kontrolü)
+8. İki ek klasörün yanındaki checkbox'ları işaretleyin (toplam 3 klasör seçili)
+9. Üç klasörden gelen verinin tek bir veri setinde birleştiğini doğrulayın
+10. Pencere başlığının "3 Data Folders Loaded" gösterecek şekilde güncellendiğini doğrulayın
+11. Tek klasör gerektiren sekmelerin devre dışı olduğunu doğrulayın (Interface Data, Part Loads, Compare Data)
+12. Single Data tab'ına gidin ve bir kanal seçin
+13. Grafiğin üç klasörden de farklı renk/isimlerle üst üste bindirilmiş trace'leri gösterdiğini doğrulayın
+14. Full data'yı CSV olarak export edin
+15. CSV'yi açın ve "DataFolder" kolonunun her satır için kaynak klasörünü gösterdiğini doğrulayın
+16. Her klasörün verisinin DataFolder etiketi ile ayırt edilebildiğini doğrulayın
+17. Tüm klasörlerin işaretini kaldırın ve sadece bir klasör işaretleyin
+18. Tek klasör sekmelerinin tekrar etkin hale geldiğini doğrulayın
+19. Uyumsuz domain'lere sahip klasörleri işaretlemeyi deneyin (TIME + FREQ)
+20. Karışık domain klasörlerini reddeden hata mesajının göründüğünü doğrulayın
+EXPECTED RESULTS:
+- Directory dock seçilen parent dizinin klasör ağacını gösterir
+- Tek klasör seçimi o klasörü yükler ve tüm sekmeleri etkinleştirir
+- Aynı klasörü yeniden seçmek gereksiz yeniden yükleme tetiklemez
+- Birden fazla klasör seçimi tüm veriyi tek bir DataFrame'de birleştirir
+- Pencere başlığı birden fazla klasör için klasör sayısını gösterir
+- Sadece-tek-klasör sekmeleri (Interface Data, Part Loads, Compare Data, Time Domain Rep) birden fazla klasörle devre dışı kalır
+- Single Data tab tüm klasörlerden trace'leri üst üste bindirerek gösterir
+- DataFolder kolonu birleştirilmiş veri setinde provenance'ı korur
+- Her satır kaynak klasör adı ile etiketlenir
+- Karışık domain klasörleri (TIME + FREQ) hata ile reddedilir
+- Dock View menüsü aracılığıyla gizlenebilir/gösterilebilir
+REQUIREMENT NO: N/A
+
