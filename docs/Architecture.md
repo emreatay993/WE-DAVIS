@@ -35,8 +35,6 @@ WE-DAVIS/
       plot_controller.py
     plotting/
       plotter.py
-    resources/
-      icon.ico
     ui/
       directory_tree_dock.py
       tab_compare_data.py
@@ -52,6 +50,9 @@ WE-DAVIS/
     data_manager.py
     main_window.py
     tooltips.py
+  resources/
+    icons/
+      app_icon.ico
   scripts/
     test_dt.py
   full_data.csv

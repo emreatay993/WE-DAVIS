@@ -24,7 +24,7 @@ EXPECTED RESULTS:
 - Sekmeler veri domain'ine göre doğru şekilde etkin/pasif olur (Time Domain Rep sadece FREQ verisi için)
 - Time-domain'e özel özellikler (spectrum, filtering) sadece TIME verisi için görünür
 - Frequency-domain'e özel özellikler (phase plots) sadece FREQ verisi için görünür
-- resources/icon.ico dosyası varsa uygulama ikonu başlık çubuğunda görüntülenir
+- resources/icons/app_icon.ico dosyası varsa uygulama ikonu başlık çubuğunda görüntülenir
 - İlk dialogu iptal etmek uygulamayı hatasız kapatır
 REQUIREMENT NO: N/A
 

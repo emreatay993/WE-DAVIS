@@ -19,7 +19,7 @@
 | `ui/tab_compare_data.py` | Qt widget | Compare data tab with column selector, comparison plot, absolute and relative difference visuals. |
 | `ui/tab_compare_part_loads.py` | Qt widget | Compare part loads tab for per-side difference plots across translational and rotational components. |
 | `ui/tab_settings.py` | Qt widget | Global settings tab managing rolling envelope options and Plotly styling parameters. |
-| `resources/icon.ico` | Asset | Application window icon used by `MainWindow`. |
+| `resources/icons/app_icon.ico` | Asset | Application window icon used by `MainWindow`. |
 | `utils/helpers.py` | Utility module | Reserved for shared helpers (currently empty placeholder). |
 
 See `ARCHITECTURE.md` for the conceptual relationships between these files.

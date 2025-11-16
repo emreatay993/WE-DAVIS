@@ -6,7 +6,7 @@ WE MechLoad Viewer is a desktop application built on PyQt5 for the shell and Plo
 
 | Layer | Modules | Responsibilities |
 |-------|---------|------------------|
-| Presentation | `app/main_window.py`, `app/ui/*`, `app/resources/icon.ico`, `app/config_manager.py`, `app/tooltips.py` | Define the Qt widgets, styling, and user interactions for menus, docks, and tabs. |
+| Presentation | `app/main_window.py`, `app/ui/*`, `resources/icons/app_icon.ico`, `app/config_manager.py`, `app/tooltips.py` | Define the Qt widgets, styling, and user interactions for menus, docks, and tabs. |
 | Controller | `app/controllers/plot_controller.py`, `app/controllers/action_handler.py` | React to UI signals, orchestrate data retrieval and manipulation, and hand figures or side effects back to widgets. |
 | Data & Services | `app/data_manager.py`, `app/analysis/data_processing.py`, `app/analysis/ansys_exporter.py`, `app/plotting/plotter.py` | Load and combine raw files, provide reusable data transforms, assemble Plotly figures, and integrate with Ansys Mechanical. |
 | Entry Point | `main.py` | Creates the `QApplication`, wires core objects, and kicks off the initial data load prompt. |

@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         self.setWindowTitle("WE-DAVIS")
         self.setMinimumSize(1200, 800)
-        icon_path = os.path.join("resources", "icon.ico")
+        icon_path = os.path.join("resources", "icons", "app_icon.ico")
         if os.path.exists(icon_path): self.setWindowIcon(QIcon(icon_path))
 
         # Menu Bar
