@@ -1,6 +1,6 @@
 # Start Here
 
-Welcome! This checklist gets you productive with WE MechLoad Viewer in under an hour.
+Welcome! This checklist gets you productive with WE-DAVIS in under an hour.
 
 ## 1. Understand the Product
 - Read `EXECUTIVE_SUMMARY.md` for the elevator pitch.
@@ -11,6 +11,7 @@ Welcome! This checklist gets you productive with WE MechLoad Viewer in under an 
 - Recommended stack: Python 3.10+ on Windows (PyQt5 with QtWebEngine requires desktop support).
 - Install dependencies from the app folder: `pip install -r app/requirements.txt`.
 - If you plan to test Ansys exports, ensure Ansys Mechanical with the `ansys-mechanical-core` Python package is installed and licensed on the same machine.
+- Multiple ANSYS versions can coexist; the application will detect installed versions in `C:\Program Files\ANSYS Inc` and allow version selection during export.
 
 ## 3. Run the Application
 1. From the repository root run `python main.py`.

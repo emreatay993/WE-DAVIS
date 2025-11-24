@@ -55,7 +55,6 @@ This guide walks through the complete workflow for WE MechLoad Viewer, from inst
 - Time-domain extras:
   - *Section Data* to clip the time range.
   - *Apply Tukey Window* (with alpha control) to taper edges before exports.
-- *Extract Data*: saves the plotted subset to CSV.
 - *Extract Part Loads as FEA Input (ANSYS)*: launches the Ansys export workflow (details in Section 6).
 
 ### 5.4 Time Domain Representation Tab
@@ -87,24 +86,35 @@ This guide walks through the complete workflow for WE MechLoad Viewer, from inst
 - Choose a destination path. The exported file includes every column and the `DataFolder` tag for traceability.
 
 ### 6.2 Tabular Extracts
-- *Single Data / Part Loads / Compare Tabs*: Use the context buttons (e.g., *Extract Data*) to write the currently selected subset to CSV. Valid only when a plot is present.
+- *Single Data / Compare Tabs*: Use the context buttons (e.g., *Extract Data*) to write the currently selected subset to CSV. Valid only when a plot is present.
 - *Time Domain Representation*: Select a frequency and interval, then click *Extract Data at Each Interval as CSV file* to download time-sampled results.
 
 ### 6.3 Ansys Mechanical Templates
 1. Load the desired dataset and switch to the Part Loads tab.
 2. Press *Extract Part Loads as FEA Input (ANSYS)*.
-3. Select one or more sides in the dialog.
-4. The application exports intermediate CSV files (original units and scaled by 1000) and launches Ansys Mechanical through the automation API:
+3. A dialog appears with two sections:
+   - **Select Parts**: Choose one or more sides to export.
+   - **ANSYS Version**: Select which ANSYS version to use for template generation.
+4. The ANSYS Version dropdown automatically detects installed versions from `C:\Program Files\ANSYS Inc` (e.g., ANSYS v232, v231).
+   - Versions are sorted with the latest version listed first and selected by default.
+   - If no versions are detected, the dropdown shows "Use Latest Available" and will use the latest version found by `ansys-mechanical-core`.
+5. Click Confirm to proceed with the export.
+6. The application exports intermediate CSV files (original units and scaled by 1000) and launches the selected version of Ansys Mechanical through the automation API:
    - Frequency-domain data creates a harmonic response template with complex loads.
    - Time-domain data creates a transient template with the appropriate sampling rate.
-5. On success the generated `.mechdat` assets are saved in the working directory and Ansys is opened for review.
+7. On success the generated `.mechdat` assets are saved in the working directory and Ansys is opened for review.
 
 ## 7. Troubleshooting
 - **Folder selection dialog keeps reappearing**: the initial load is required. Canceling the very first prompt will close the app; relaunch and choose a valid folder.
 - **Tabs disabled**: Certain tabs require single-folder context or matching columns. Load exactly one folder to view interface or part load tabs.
 - **Blank plots**: Verify the selected channel exists and contains numeric data. For spectrum plots ensure the `Spectrum Slices` input is a positive integer.
 - **Comparison data rejected**: Both datasets must share the same domain (`TIME` vs `FREQ`) and the target column names. Clean up header mismatches in the source `.pld` files.
-- **Ansys export fails**: Confirm `ansys-mechanical-core` is installed and licensed. Review the error dialog for missing channels or data inconsistencies.
+- **Ansys export fails**: The error dialog will indicate if the selected version is not supported or produced errors during initialization. Check that:
+  - `ansys-mechanical-core` is installed and licensed.
+  - The selected ANSYS version is installed properly and supports the export operation.
+  - Try selecting a different ANSYS version from the dropdown if the current one fails.
+  - Review the detailed error message for specific issues like missing channels or data inconsistencies.
+- **No ANSYS versions detected**: The application looks for versions in `C:\Program Files\ANSYS Inc`. If your installation is in a custom location, the dropdown will show "Use Latest Available" and rely on the default version detection by `ansys-mechanical-core`.
 
 ## 8. Support
 - Bug reports and feature requests go to the maintainer listed in the Settings tab footer.

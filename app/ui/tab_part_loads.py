@@ -50,9 +50,6 @@ class PartLoadsTab(QtWidgets.QWidget):
         splitter.addWidget(self.r_series_plot)
 
         # Lower Controls
-        self.data_point_selector = QComboBox()
-        self.data_point_selector.setEditable(True)
-        self.extract_data_button = QPushButton("Extract Data")
         self.extract_all_data_button = QPushButton("Extract Part Loads as FEA Input (ANSYS)")
 
         # Layouts
@@ -69,8 +66,7 @@ class PartLoadsTab(QtWidgets.QWidget):
         upper_layout.addStretch()
 
         lower_layout = QHBoxLayout()
-        lower_layout.addWidget(self.data_point_selector)
-        lower_layout.addWidget(self.extract_data_button)
+        lower_layout.addStretch()
         lower_layout.addWidget(self.extract_all_data_button)
 
         main_layout = QVBoxLayout(self)

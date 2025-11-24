@@ -8,7 +8,7 @@ import pandas as pd
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QListWidget, QAbstractItemView,
                              QListWidgetItem, QHBoxLayout, QPushButton, QMessageBox,
-                             QFileDialog)
+                             QFileDialog, QComboBox, QLabel, QGroupBox)
 from scipy.signal.windows import tukey
 
 from ..analysis.ansys_exporter import AnsysExporter
@@ -24,8 +24,28 @@ class ActionHandler(QtCore.QObject):
         self.main_window = main_window
         self.data_manager = data_manager
 
+    def _get_available_ansys_versions(self):
+        """Scans for available ANSYS versions in the ANSYS Inc directory."""
+        ansys_base_path = r"C:\Program Files\ANSYS Inc"
+        available_versions = []
+        
+        if os.path.exists(ansys_base_path):
+            try:
+                for item in os.listdir(ansys_base_path):
+                    if item.startswith('v') and os.path.isdir(os.path.join(ansys_base_path, item)):
+                        # Extract version number (e.g., 'v232' -> 232)
+                        version_num = item[1:]  # Remove 'v' prefix
+                        if version_num.isdigit():
+                            available_versions.append(int(version_num))
+            except Exception as e:
+                print(f"Error scanning ANSYS versions: {e}")
+        
+        # Sort versions in descending order (latest first)
+        available_versions.sort(reverse=True)
+        return available_versions
+
     def _get_sides_for_export(self):
-        """Creates and shows a dialog to select multiple sides for export."""
+        """Creates and shows a dialog to select multiple sides for export and ANSYS version."""
         all_sides = [self.main_window.tab_part_loads.side_filter_selector.itemText(i) for i in
                      range(self.main_window.tab_part_loads.side_filter_selector.count())]
         current_side = self.main_window.tab_part_loads.side_filter_selector.currentText()
@@ -33,6 +53,10 @@ class ActionHandler(QtCore.QObject):
         dialog = QDialog(self.main_window)
         dialog.setWindowTitle("Select Parts to Export")
         layout = QVBoxLayout(dialog)
+        
+        # Parts selection group
+        parts_group = QGroupBox("Select Parts")
+        parts_layout = QVBoxLayout()
         list_widget = QListWidget()
         list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
@@ -41,7 +65,29 @@ class ActionHandler(QtCore.QObject):
             list_widget.addItem(item)
             if side == current_side:
                 item.setSelected(True)
+        
+        parts_layout.addWidget(list_widget)
+        parts_group.setLayout(parts_layout)
+        
+        # ANSYS version selection group
+        version_group = QGroupBox("ANSYS Version")
+        version_layout = QVBoxLayout()
+        version_combo = QComboBox()
+        
+        available_versions = self._get_available_ansys_versions()
+        
+        if available_versions:
+            for version in available_versions:
+                version_combo.addItem(f"ANSYS v{version}", version)
+            version_combo.setCurrentIndex(0)  # Select latest version by default
+        else:
+            version_combo.addItem("Use Latest Available", None)
+        
+        version_layout.addWidget(QLabel("Select ANSYS version for template generation:"))
+        version_layout.addWidget(version_combo)
+        version_group.setLayout(version_layout)
 
+        # Buttons
         button_layout = QHBoxLayout()
         confirm_button = QPushButton("Confirm")
         confirm_button.clicked.connect(dialog.accept)
@@ -50,12 +96,15 @@ class ActionHandler(QtCore.QObject):
         button_layout.addWidget(confirm_button)
         button_layout.addWidget(cancel_button)
 
-        layout.addWidget(list_widget)
+        layout.addWidget(parts_group)
+        layout.addWidget(version_group)
         layout.addLayout(button_layout)
 
         if dialog.exec_() == QDialog.Accepted:
-            return [item.text() for item in list_widget.selectedItems()]
-        return None
+            selected_sides = [item.text() for item in list_widget.selectedItems()]
+            selected_version = version_combo.currentData()
+            return selected_sides, selected_version
+        return None, None
 
     @QtCore.pyqtSlot()
     def handle_compare_data_selection(self):
@@ -112,7 +161,7 @@ class ActionHandler(QtCore.QObject):
             QMessageBox.warning(self.main_window, "No Data", "Please load data before exporting.")
             return
 
-        selected_sides = self._get_sides_for_export()
+        selected_sides, selected_version = self._get_sides_for_export()
         if not selected_sides:
             return
 
@@ -170,7 +219,7 @@ class ActionHandler(QtCore.QObject):
 
         df_combined_converted.to_csv("extracted_loads_of_all_selected_parts_in_converted_units.csv", index=False)
 
-        exporter = AnsysExporter()
+        exporter = AnsysExporter(version=selected_version)
         if data_domain == 'FREQ':
             exporter.create_harmonic_template(df_processed, data_domain)
         elif data_domain == 'TIME':

@@ -1,12 +1,12 @@
-# WE MechLoad Viewer
+# WE-DAVIS
 
-WE MechLoad Viewer is a PyQt5 desktop application for inspecting mechanical load datasets produced by WE Davis style test rigs. It ingests raw `.pld` exports, exposes rich visualizations with Plotly, compares multiple runs, and prepares data for FEA handoff.
+WE-DAVIS is a PyQt5 desktop application for inspecting mechanical load datasets produced by WE Davis style test rigs. It ingests raw `.pld` exports, exposes rich visualizations with Plotly, compares multiple runs, and prepares data for FEA handoff.
 
 ## Core Capabilities
 - Load one or more raw data folders containing `full.pld` and `max.pld` pairs and automatically stitch them into a single pandas DataFrame.
 - Switch between frequency-domain and time-domain analysis with context-aware tooling (phase plots, spectrum views, Tukey windowing, sectioning, sampling-metric overlays).
 - Browse dataset folders, plot individual signals, compare runs, and inspect part loads and interface forces through dedicated tabs.
-- Export harmonized CSV files and generate Ansys Mechanical templates directly from the UI.
+- Export harmonized CSV files and generate Ansys Mechanical templates directly from the UI with selectable ANSYS version support.
 - Control global Plotly styling (fonts, legend placement, hover behavior, opacity) without touching code.
 
 ## Quick Start

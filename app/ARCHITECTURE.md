@@ -1,6 +1,6 @@
 # Architecture Overview
 
-WE MechLoad Viewer is a desktop application built on PyQt5 for the shell and Plotly for rendering interactive charts. The codebase follows a Model-View-Controller pattern with a thin data layer, tab-specific views, shared controllers, and reusable analysis helpers.
+WE-DAVIS is a desktop application built on PyQt5 for the shell and Plotly for rendering interactive charts. The codebase follows a Model-View-Controller pattern with a thin data layer, tab-specific views, shared controllers, and reusable analysis helpers.
 
 ## Layered Structure
 
@@ -47,6 +47,9 @@ Tabs do not access data directly; they expose signals and receive ready-to-rende
   - Maintains derived UI state: enabling/disabling phase plots, adding computed selections, and caching data for time-domain reconstruction.
 - **ActionHandler**
   - Handles workflow actions that span multiple tabs or require dialogs (comparison file selection, Ansys export, time-domain CSV extraction).
+  - Manages the Ansys export dialog which presents two sections: part selection and ANSYS version selection.
+  - Scans `C:\Program Files\ANSYS Inc` for available ANSYS versions (folders starting with 'v') and populates a dropdown sorted by version (latest first).
+  - Passes the selected ANSYS version to `AnsysExporter` for template generation using the specific version.
   - Applies the same processing helpers as `PlotController` to keep exported data aligned with what the user sees.
 - **Plotter**
   - Provides figure factories (`create_standard_figure`, `create_spectrum_figure`, comparison and difference charts, rolling envelopes).
@@ -54,7 +57,7 @@ Tabs do not access data directly; they expose signals and receive ready-to-rende
   - Uses Plotly's HTML output to feed `QWebEngineView` widgets; cleans up temporary files per widget.
 - **Analysis Helpers**
   - `analysis/data_processing.py` offers pure functions for sectioning, Tukey windowing, Butterworth filtering, computed metrics, and multi-folder dataset assembly.
-  - `analysis/ansys_exporter.py` encapsulates all interaction with `ansys.mechanical.core`, building harmonic or transient templates from selected loads.
+  - `analysis/ansys_exporter.py` encapsulates all interaction with `ansys.mechanical.core`, building harmonic or transient templates from selected loads using a specific ANSYS version when provided, or defaulting to the latest available version.
 
 ## Data Model
 - Primary DataFrame columns include:
@@ -82,5 +85,6 @@ Tabs do not access data directly; they expose signals and receive ready-to-rende
 ## Known Limitations and Opportunities
 - No automated tests; manual verification is required for both TIME and FREQ datasets.
 - `AnsysExporter` is tightly coupled to Ansys Mechanical APIs and can be brittle if the external package version changes.
+- ANSYS version detection assumes a standard installation path (`C:\Program Files\ANSYS Inc`) and may not detect custom installations.
 - `DataManager.load_data_from_directory()` exits the application when the user cancels during the first open; consider soft-failure behavior.
 - Re-rendering on every control change can be expensive with very large datasets; caching or decimation strategies could improve responsiveness.

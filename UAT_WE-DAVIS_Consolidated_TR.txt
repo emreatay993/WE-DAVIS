@@ -134,21 +134,26 @@ TEST STEPS:
 11. Tukey alpha'yı 0.1'e ayarlayın ve grafiğin window taper uygulanarak güncellendiğini doğrulayın
 12. Time-domain verisi için: "Section Data" işaretleyin ve Min Time: 2, Max Time: 8 girin
 13. Grafiklerin sadece 2-8 saniye arasındaki veriyi gösterdiğini doğrulayın
-14. "Extract Data" butonuna tıklayın ve CSV dosyasını kaydedin
-15. Dışa aktarılan CSV'nin şu anda görüntülenen part loads verisini içerdiğini doğrulayın
-16. "Extract Part Loads as FEA Input (ANSYS)" butonuna tıklayın
-17. Görünen dialogda bir veya daha fazla side seçin
-18. FREQ verisi için: ANSYS'de harmonic response template'inin oluşturulduğunu doğrulayın
-19. TIME verisi için: ANSYS'de doğru sampling rate ile transient template'inin oluşturulduğunu doğrulayın
-20. CSV dosyalarının oluşturulduğunu doğrulayın (orijinal birimler ve 1000 ile ölçeklenmiş)
+14. "Extract Part Loads as FEA Input (ANSYS)" butonuna tıklayın
+15. İki bölümü olan dialogun göründüğünü doğrulayın: "Select Parts" ve "ANSYS Version"
+16. Parts listesinden bir veya daha fazla side seçin
+17. ANSYS version dropdown'ının mevcut versiyonlarla doldurulduğunu doğrulayın (örn. ANSYS v232, v231) en güncel olanlar başta
+18. Dropdown'dan belirli bir ANSYS versiyonu seçin (veya varsayılan en güncel versiyonu seçili bırakın)
+19. Confirm butonuna tıklayın
+20. FREQ verisi için: Seçilen ANSYS versiyonu kullanılarak harmonic response template'inin oluşturulduğunu doğrulayın
+21. TIME verisi için: Seçilen ANSYS versiyonu kullanılarak doğru sampling rate ile transient template'inin oluşturulduğunu doğrulayın
+22. CSV dosyalarının oluşturulduğunu doğrulayın (orijinal birimler ve 1000 ile ölçeklenmiş)
 EXPECTED RESULTS:
 - Interface Data tab seçilen interface ve side için altı force/moment bileşenini gösterir
 - Part Loads tab translational ve rotational yükleri ayrı grafiklerde gösterir
 - Exclude checkbox T2/T3/R2/R3 bireysel bileşenlerini başarıyla filtreler
 - Tukey window time-domain verisi kenarlarına tapered window uygular
 - Section Data part loads'u belirtilen zaman aralığı ile sınırlar
-- Extract Data butonu mevcut görünümü başarıyla CSV'ye aktarır
-- ANSYS export domain tipine göre uygun template'leri oluşturur
+- ANSYS export dialogu iki bölüm gösterir: parts seçimi ve version seçimi
+- ANSYS version dropdown C:\Program Files\ANSYS Inc klasöründen mevcut versiyonları gösterir (v231, v232, vb.)
+- Versiyonlar en güncel versiyon başta olmak üzere sıralanır ve varsayılan olarak seçilidir
+- Eğer hiç versiyon bulunamazsa dropdown "Use Latest Available" gösterir
+- ANSYS export seçilen versiyonu kullanarak uygun template'leri oluşturur
 - Frequency-domain için complex load'lar ile harmonic response template
 - Time-domain için doğru time step'ler ile transient template
 - Birden fazla klasör yüklendiğinde her iki sekme de devre dışı kalır

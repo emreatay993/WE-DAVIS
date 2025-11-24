@@ -17,13 +17,14 @@ class AnsysExporter:
     This class contains all dependencies on the ansys-mechanical-core library.
     """
 
-    def __init__(self):
+    def __init__(self, version=None):
         self.app_ansys = None
         self.Model = None
         self.ExtAPI = None
         self.DataModel = None
         self.Quantity = None
         self.Ansys = None
+        self.version = version  # Store the ANSYS version to use
 
     def _init_ansys_session(self):
         """Initializes a new Ansys Mechanical session."""
@@ -34,7 +35,13 @@ class AnsysExporter:
             print("Imported.")
 
             print("Starting Ansys Mechanical...")
-            self.app_ansys = mech.App()
+            # Initialize App with version if specified
+            if self.version is not None:
+                print(f"Using ANSYS version: {self.version}")
+                self.app_ansys = mech.App(version=self.version)
+            else:
+                print("Using latest available ANSYS version")
+                self.app_ansys = mech.App()
             print("Ansys Mechanical session started.")
 
             globals_map = global_variables(self.app_ansys)
@@ -47,8 +54,12 @@ class AnsysExporter:
             self.ExtAPI.Application.ActiveUnitSystem = self.Ansys.ACT.Interfaces.Common.MechanicalUnitSystem.StandardMKS
             return True
         except Exception as e:
+            version_text = f" (version {self.version})" if self.version else ""
             QMessageBox.critical(None, 'Ansys Error',
-                                 f"Failed to initialize Ansys Mechanical.\nEnsure it is installed and configured correctly.\n\nError: {e}")
+                                 f"The selected ANSYS version{version_text} is not supported or produced errors during initialization.\n\n"
+                                 f"Please check that the selected version is installed properly and supports the export operation.\n\n"
+                                 f"You may try selecting a different ANSYS version from the dropdown menu.\n\n"
+                                 f"Error details: {e}")
             return False
 
     def _close_ansys_session(self):

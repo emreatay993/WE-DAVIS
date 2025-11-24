@@ -134,21 +134,26 @@ TEST STEPS:
 11. Set Tukey alpha to 0.1 and verify plot updates with window taper applied
 12. For time-domain data: Check "Section Data" and enter Min Time: 2, Max Time: 8
 13. Verify plots display only data between 2-8 seconds
-14. Click "Extract Data" button and save CSV file
-15. Verify exported CSV contains currently displayed part loads data
-16. Click "Extract Part Loads as FEA Input (ANSYS)" button
-17. Select one or more sides in the dialog that appears
-18. For FREQ data: Verify harmonic response template is generated in ANSYS
-19. For TIME data: Verify transient template is generated in ANSYS with correct sampling rate
-20. Verify CSV files are created (original units and scaled by 1000)
+14. Click "Extract Part Loads as FEA Input (ANSYS)" button
+15. Verify dialog appears with two sections: "Select Parts" and "ANSYS Version"
+16. Select one or more sides from the parts list
+17. Verify ANSYS version dropdown is populated with available versions (e.g., ANSYS v232, v231) sorted latest first
+18. Select a specific ANSYS version from the dropdown (or leave default latest version selected)
+19. Click Confirm button
+20. For FREQ data: Verify harmonic response template is generated using selected ANSYS version
+21. For TIME data: Verify transient template is generated using selected ANSYS version with correct sampling rate
+22. Verify CSV files are created (original units and scaled by 1000)
 EXPECTED RESULTS:
 - Interface Data tab displays all six force/moment components for selected interface and side
 - Part Loads tab shows translational and rotational loads in separate plots
 - Exclude checkbox successfully filters out T2/T3/R2/R3 individual components
 - Tukey window applies tapered window to time-domain data edges
 - Section Data limits part loads to specified time range
-- Extract Data button exports current view to CSV successfully
-- ANSYS export generates appropriate templates based on domain type
+- ANSYS export dialog shows two sections: parts selection and version selection
+- ANSYS version dropdown displays available versions from C:\Program Files\ANSYS Inc (v231, v232, etc.)
+- Versions are sorted with latest version shown first and selected by default
+- If no versions found, dropdown shows "Use Latest Available"
+- ANSYS export generates appropriate templates using the selected version
 - Harmonic response template for frequency-domain with complex loads
 - Transient template for time-domain with correct time steps
 - Both tabs are disabled when multiple folders are loaded
