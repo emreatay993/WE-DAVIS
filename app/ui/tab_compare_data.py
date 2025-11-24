@@ -1,7 +1,7 @@
 # File: app/ui/tab_compare_data.py
 
 from PyQt5 import QtWidgets, QtCore, QtWebEngineWidgets
-from PyQt5.QtWidgets import QVBoxLayout, QSplitter, QComboBox, QPushButton
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QSplitter, QComboBox, QPushButton, QSizePolicy
 from ..plotting.plotter import load_fig_to_webview
 from .. import config_manager
 
@@ -39,11 +39,16 @@ class CompareDataTab(QtWidgets.QWidget):
         self.compare_column_selector = QComboBox()
         self.compare_column_selector.setEditable(False)
         self.compare_button = QPushButton("Select Data for Comparison")
+        self.compare_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         # Layout
+        controls_layout = QHBoxLayout()
+        controls_layout.addWidget(self.compare_column_selector)
+        controls_layout.addStretch()
+        controls_layout.addWidget(self.compare_button)
+
         main_layout = QVBoxLayout(self)
-        main_layout.addWidget(self.compare_button)
-        main_layout.addWidget(self.compare_column_selector)
+        main_layout.addLayout(controls_layout)
         main_layout.addWidget(splitter_main)
 
         # Styles

@@ -16,7 +16,7 @@
 | `ui/tab_interface_data.py` | 83 | Qt widget | Interface tab displaying translational and rotational components for a selected interface and side. |
 | `ui/tab_part_loads.py` | 119 | Qt widget | Part loads tab with side filtering, time-domain conditioning, and Ansys export trigger with styled button. |
 | `ui/tab_time_domain_represent.py` | 56 | Qt widget | Time-domain representation tab for reconstructing angle-based loads at specific frequencies. |
-| `ui/tab_compare_data.py` | 76 | Qt widget | Compare data tab with column selector, comparison plot, absolute and relative difference visuals. |
+| `ui/tab_compare_data.py` | 81 | Qt widget | Compare data tab with column selector and comparison button in horizontal layout (button aligned right), comparison plot, absolute and relative difference visuals. |
 | `ui/tab_compare_part_loads.py` | 48 | Qt widget | Compare part loads tab for per-side difference plots across translational and rotational components. |
 | `ui/tab_settings.py` | 110 | Qt widget | Global settings tab managing rolling envelope options and Plotly styling parameters. |
 | `resources/icons/app_icon.ico` | — | Asset | Application window icon used by `MainWindow`. |
