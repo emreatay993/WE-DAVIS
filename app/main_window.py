@@ -106,7 +106,9 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         # Data Loading Signals
         self.data_manager.dataLoaded.connect(self.on_data_loaded)
+        self.data_manager.dataLoadFailed.connect(self.on_data_load_failed)
         self.data_manager.comparisonDataLoaded.connect(self.on_comparison_data_loaded)
+        self.data_manager.loadingProgress.connect(self.on_loading_progress)
         self.dock.directories_selected.connect(self._on_directories_selected)
         self.open_action.triggered.connect(self.data_manager.load_data_from_directory)
         self.export_full_csv_action.triggered.connect(self._export_full_data_csv)
@@ -204,6 +206,19 @@ class MainWindow(QMainWindow):
             self.tab_settings.rolling_min_max_checkbox.setChecked(False)
 
         self.plot_controller.update_all_plots_from_settings()
+
+    @QtCore.pyqtSlot(int, int, str)
+    def on_loading_progress(self, current_idx, total_folders, folder_name):
+        """Update window title to show loading progress."""
+        if total_folders > 1:
+            self.setWindowTitle(f"WE-DAVIS - Loading... (Folder {current_idx}/{total_folders}: {folder_name})")
+        else:
+            self.setWindowTitle(f"WE-DAVIS - Loading... ({folder_name})")
+
+    @QtCore.pyqtSlot(str)
+    def on_data_load_failed(self, error_message):
+        """Restore window title when loading fails."""
+        self.setWindowTitle("WE-DAVIS")
 
     @QtCore.pyqtSlot(pd.DataFrame)
     def on_comparison_data_loaded(self, df_compare):

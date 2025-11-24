@@ -15,6 +15,7 @@ class DataManager(QtCore.QObject):
     dataLoaded = QtCore.pyqtSignal(pd.DataFrame, str, str) # Strings are for domain type and folder path, respectively.
     dataLoadFailed = QtCore.pyqtSignal(str)
     comparisonDataLoaded = QtCore.pyqtSignal(pd.DataFrame)
+    loadingProgress = QtCore.pyqtSignal(int, int, str)  # (current_index, total_folders, folder_name)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,7 +38,12 @@ class DataManager(QtCore.QObject):
         data_domain = None  # Determined by the first valid folder
         first_valid_folder = None
 
-        for folder in folder_paths:
+        total_folders = len(folder_paths)
+        for idx, folder in enumerate(folder_paths, start=1):
+            # Emit progress signal
+            folder_name = os.path.basename(folder)
+            self.loadingProgress.emit(idx, total_folders, folder_name)
+            
             try:
                 # 1. Validate folder contents
                 full_pld_files = self._get_file_path(folder, 'full.pld')
