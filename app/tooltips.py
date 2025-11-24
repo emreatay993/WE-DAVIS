@@ -44,3 +44,22 @@ peak magnitudes.<br><br>
 &#8226; Fewer points = faster rendering with coarser bounds<br><br>
 <i>Ideal for quick exploratory analysis of long-duration data where you need to see overall behavior without plotting every individual cycle and time point.</i>
 """
+
+ANSYS_EXPORT = """
+<b>Export part loads as FEA input for ANSYS Mechanical simulation.</b><br><br>
+Generates ready-to-use ANSYS templates with all load data properly formatted 
+for finite element analysis.<br><br>
+<b>This button will:</b><br>
+&#8226; Open a dialog to select which parts (sides) to export<br>
+&#8226; Let you choose the specific ANSYS version to use for template generation<br>
+&#8226; Export intermediate CSV files (original units and scaled by 1000)<br>
+&#8226; Launch ANSYS Mechanical with the appropriate analysis template<br><br>
+<b>Generated templates:</b><br>
+&#8226; <b>Frequency-domain data:</b> Harmonic response analysis with complex loads<br>
+&#8226; <b>Time-domain data:</b> Transient analysis with correct time steps and sampling rate<br><br>
+<b>Version Selection:</b><br>
+The dialog automatically detects installed ANSYS versions and allows you to select 
+which one to use. If a version fails, try selecting a different version.<br><br>
+<i>Requires ansys-mechanical-core package to be installed and licensed. 
+Applies current Section Data and Tukey Window settings if enabled.</i>
+"""

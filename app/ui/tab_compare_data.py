@@ -42,9 +42,9 @@ class CompareDataTab(QtWidgets.QWidget):
 
         # Layout
         main_layout = QVBoxLayout(self)
+        main_layout.addWidget(self.compare_button)
         main_layout.addWidget(self.compare_column_selector)
         main_layout.addWidget(splitter_main)
-        main_layout.addWidget(self.compare_button)
 
         # Styles
         self.compare_button.setStyleSheet(config_manager.COMPARE_BUTTON_STYLE)

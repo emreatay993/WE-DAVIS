@@ -4,6 +4,8 @@ from PyQt5 import QtWidgets, QtCore, QtWebEngineWidgets
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QSplitter, QComboBox,
                              QPushButton, QCheckBox, QDoubleSpinBox, QLineEdit, QLabel)
 from ..plotting.plotter import load_fig_to_webview
+from .. import tooltips
+from .. import config_manager
 
 class PartLoadsTab(QtWidgets.QWidget):
     plot_parameters_changed = QtCore.pyqtSignal()
@@ -49,8 +51,10 @@ class PartLoadsTab(QtWidgets.QWidget):
         splitter.addWidget(self.t_series_plot)
         splitter.addWidget(self.r_series_plot)
 
-        # Lower Controls
+        # ANSYS Export Button
         self.extract_all_data_button = QPushButton("Extract Part Loads as FEA Input (ANSYS)")
+        self.extract_all_data_button.setToolTip(tooltips.ANSYS_EXPORT)
+        self.extract_all_data_button.setStyleSheet(config_manager.COMPARE_BUTTON_STYLE)
 
         # Layouts
         upper_layout = QHBoxLayout()
@@ -64,15 +68,11 @@ class PartLoadsTab(QtWidgets.QWidget):
         upper_layout.addWidget(self.section_max_label)
         upper_layout.addWidget(self.section_max_input)
         upper_layout.addStretch()
-
-        lower_layout = QHBoxLayout()
-        lower_layout.addStretch()
-        lower_layout.addWidget(self.extract_all_data_button)
+        upper_layout.addWidget(self.extract_all_data_button)
 
         main_layout = QVBoxLayout(self)
         main_layout.addLayout(upper_layout)
         main_layout.addWidget(splitter)
-        main_layout.addLayout(lower_layout)
 
         # Connect signals
         self.side_filter_selector.currentIndexChanged.connect(self.plot_parameters_changed)
