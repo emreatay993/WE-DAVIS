@@ -22,10 +22,11 @@ class TimeDomainRepresentTab(QtWidgets.QWidget):
         self.data_point_selector.addItem("Select a frequency [Hz] to plot")
 
         self.time_domain_plot = QtWebEngineWidgets.QWebEngineView()
+        self.time_domain_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
 
         self.interval_selector = QComboBox()
         self.interval_selector.setEditable(True)
-        self.interval_selector.addItem("Select an Interval")
+        self.interval_selector.addItem("Select an Interval [deg]")
         for i in range(1, 361):
             if 360 % i == 0:
                 self.interval_selector.addItem(str(i))
@@ -38,7 +39,7 @@ class TimeDomainRepresentTab(QtWidgets.QWidget):
         selector_layout.addWidget(self.data_point_selector)
 
         extract_layout = QHBoxLayout()
-        extract_layout.addWidget(QLabel("Select an Interval:"))
+        extract_layout.addWidget(QLabel("Select an Interval [deg]:"))
         extract_layout.addWidget(self.interval_selector)
         extract_layout.addWidget(self.extract_button)
 

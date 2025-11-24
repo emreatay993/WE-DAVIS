@@ -18,8 +18,11 @@ class CompareDataTab(QtWidgets.QWidget):
     def _setup_ui(self):
         # Plots
         self.compare_regular_plot = QtWebEngineWidgets.QWebEngineView()
+        self.compare_regular_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         self.compare_absolute_diff_plot = QtWebEngineWidgets.QWebEngineView()
+        self.compare_absolute_diff_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         self.compare_percent_diff_plot = QtWebEngineWidgets.QWebEngineView()
+        self.compare_percent_diff_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
 
         splitter_upper = QSplitter(QtCore.Qt.Vertical)
         splitter_upper.addWidget(self.compare_regular_plot)

@@ -133,12 +133,27 @@ class MainWindow(QMainWindow):
     def _handle_time_domain_tab_visibility(self):
         is_present = self.tab_widget.indexOf(self.tab_time_domain_represent) != -1
         if self.data_domain == 'FREQ' and not is_present:
-            self.tab_widget.insertTab(3, self.tab_time_domain_represent, "Time Domain Rep.")
+            self.tab_widget.insertTab(3, self.tab_time_domain_represent, "Time Domain Representation")
         elif self.data_domain == 'TIME' and is_present:
             self.tab_widget.removeTab(self.tab_widget.indexOf(self.tab_time_domain_represent))
 
     def _populate_all_selectors(self):
         if self.df is None: return
+
+        # Block signals on all selectors to prevent triggering plot updates during population
+        selectors_to_block = [
+            self.tab_single_data.column_selector,
+            self.tab_interface_data.interface_selector,
+            self.tab_part_loads.side_filter_selector,
+            self.tab_compare_part_loads.side_filter_selector,
+        ]
+        
+        if self.data_domain == 'FREQ':
+            selectors_to_block.append(self.tab_time_domain_represent.data_point_selector)
+        
+        # Block all signals
+        for selector in selectors_to_block:
+            selector.blockSignals(True)
 
         # Single Data Tab
         regular_cols = [c for c in self.df.columns if 'Phase_' not in c and c not in ['FREQ', 'TIME', 'NO', 'DataFolder']]
@@ -168,6 +183,10 @@ class MainWindow(QMainWindow):
             self.tab_time_domain_represent.data_point_selector.clear()
             self.tab_time_domain_represent.data_point_selector.addItem("Select a frequency [Hz] to plot")
             self.tab_time_domain_represent.data_point_selector.addItems(freq_items)
+        
+        # Unblock all signals
+        for selector in selectors_to_block:
+            selector.blockSignals(False)
 
     @QtCore.pyqtSlot(pd.DataFrame, str, str)
     def on_data_loaded(self, data, data_domain, folder_path):
@@ -203,9 +222,19 @@ class MainWindow(QMainWindow):
         self.tab_part_loads.set_time_domain_features_visibility(is_time_domain)
         self.tab_settings.rolling_min_max_checkbox.setEnabled(is_time_domain)
         if not is_time_domain:
+            # Block signals to prevent triggering settings_changed and double plot update
+            self.tab_settings.rolling_min_max_checkbox.blockSignals(True)
             self.tab_settings.rolling_min_max_checkbox.setChecked(False)
+            self.tab_settings.rolling_min_max_checkbox.blockSignals(False)
 
+        # Show processing status before generating plots
+        self.setWindowTitle("WE-DAVIS - Processing data and generating plots...")
+        QtWidgets.QApplication.processEvents()  # Force UI update
+        
         self.plot_controller.update_all_plots_from_settings()
+        
+        # Restore the final title after processing
+        self.setWindowTitle(title)
 
     @QtCore.pyqtSlot(int, int, str)
     def on_loading_progress(self, current_idx, total_folders, folder_name):

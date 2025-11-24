@@ -4,6 +4,7 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QComboBox,
                              QLabel, QCheckBox, QGroupBox, QLineEdit)
 from .. import config_manager
+from .. import tooltips
 
 class SettingsTab(QtWidgets.QWidget):
     settings_changed = QtCore.pyqtSignal()
@@ -17,6 +18,7 @@ class SettingsTab(QtWidgets.QWidget):
         data_processing_group = QGroupBox("Data Processing Tools For Time Domain Data (Beta)")
         data_processing_layout = QVBoxLayout()
         self.rolling_min_max_checkbox = QCheckBox("Show Plots as Rolling Min-Max Envelope")
+        self.rolling_min_max_checkbox.setToolTip(tooltips.ROLLING_MIN_MAX_ENVELOPE)
         self.plot_as_bars_checkbox = QCheckBox("Plot as Bars")
         self.desired_num_points_input = QLineEdit("50000")
         self.num_points_label = QLabel("Number of Points Shown:")

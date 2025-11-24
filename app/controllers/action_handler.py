@@ -70,7 +70,7 @@ class ActionHandler(QtCore.QObject):
         try:
             tab = self.main_window.tab_time_domain_represent
             interval_text = tab.interval_selector.currentText()
-            if "Select an Interval" in interval_text:
+            if "Select an Interval [deg]" in interval_text:
                 QMessageBox.warning(self.main_window, "Selection Required", "Please select a valid interval.")
                 return
             interval = int(interval_text)

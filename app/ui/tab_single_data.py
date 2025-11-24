@@ -22,8 +22,11 @@ class SingleDataTab(QtWidgets.QWidget):
     def _setup_ui(self):
         self.splitter = QSplitter(QtCore.Qt.Vertical)
         self.regular_plot = QtWebEngineWidgets.QWebEngineView()
+        self.regular_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         self.phase_plot = QtWebEngineWidgets.QWebEngineView()
+        self.phase_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         self.spectrum_plot = QtWebEngineWidgets.QWebEngineView()
+        self.spectrum_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
 
         self.splitter.addWidget(self.regular_plot)
 

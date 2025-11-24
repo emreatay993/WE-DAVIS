@@ -25,7 +25,9 @@ class InterfaceDataTab(QtWidgets.QWidget):
         self.side_selector = QComboBox()
         self.side_selector.setEditable(True)
         self.t_series_plot = QtWebEngineWidgets.QWebEngineView()
+        self.t_series_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         self.r_series_plot = QtWebEngineWidgets.QWebEngineView()
+        self.r_series_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
 
         splitter = QSplitter(QtCore.Qt.Vertical)
         splitter.addWidget(self.t_series_plot)

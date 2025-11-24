@@ -42,7 +42,9 @@ class PartLoadsTab(QtWidgets.QWidget):
 
         # Plots
         self.t_series_plot = QtWebEngineWidgets.QWebEngineView()
+        self.t_series_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         self.r_series_plot = QtWebEngineWidgets.QWebEngineView()
+        self.r_series_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         splitter = QSplitter(QtCore.Qt.Vertical)
         splitter.addWidget(self.t_series_plot)
         splitter.addWidget(self.r_series_plot)
