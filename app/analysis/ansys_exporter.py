@@ -17,7 +17,7 @@ class AnsysExporter:
     This class contains all dependencies on the ansys-mechanical-core library.
     """
 
-    def __init__(self, version=None):
+    def __init__(self, version=None, ansys_base_path=None):
         self.app_ansys = None
         self.Model = None
         self.ExtAPI = None
@@ -25,13 +25,24 @@ class AnsysExporter:
         self.Quantity = None
         self.Ansys = None
         self.version = version  # Store the ANSYS version to use
+        self.ansys_base_path = ansys_base_path  # Store the ANSYS installation base path
+
+    def _get_ansys_root(self):
+        """Returns the full path to the ANSYS version installation directory."""
+        if self.ansys_base_path:
+            return rf"{self.ansys_base_path}\v{self.version}"
+        else:
+            # Default fallback path
+            return rf"C:\Program Files\ANSYS Inc\v{self.version}"
 
     def _verify_ansys_dll(self):
         """Verifies that the required Ansys DLL exists before initialization."""
         if self.version is None:
             return True  # Let ansys-mechanical-core find latest version
         
-        dll_path = rf"C:\Program Files\ANSYS Inc\v{self.version}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
+        ansys_root = self._get_ansys_root()
+        dll_path = rf"{ansys_root}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
+        
         if os.path.exists(dll_path):
             print(f"✓ Found Ansys DLL: {dll_path}")
             return True
@@ -45,7 +56,7 @@ class AnsysExporter:
                                  f"• ANSYS installation is incomplete\n\n"
                                  f"Solutions:\n"
                                  f"1. Try selecting a different ANSYS version\n"
-                                 f"2. Verify ANSYS is installed at: C:\\Program Files\\ANSYS Inc\\v{self.version}\\")
+                                 f"2. Verify ANSYS is installed at: {ansys_root}")
             return False
 
     def _init_ansys_session(self):
@@ -62,7 +73,7 @@ class AnsysExporter:
 
             # Set Ansys installation path explicitly to avoid VDI/virtual app path issues
             if self.version is not None:
-                ansys_root = rf"C:\Program Files\ANSYS Inc\v{self.version}"
+                ansys_root = self._get_ansys_root()
                 if os.path.exists(ansys_root):
                     # Set environment variables that ansys-mechanical-core uses to find DLLs
                     os.environ[f'AWP_ROOT{self.version}'] = ansys_root
@@ -103,14 +114,16 @@ class AnsysExporter:
             error_str = str(e).lower()
             if 'dll' in error_str or 'could not find' in error_str or 'file not found' in error_str:
                 if self.version:
-                    expected_dll_path = rf"C:\Program Files\ANSYS Inc\v{self.version}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
+                    ansys_root = self._get_ansys_root()
+                    expected_dll_path = rf"{ansys_root}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
                     error_msg += f"DLL Loading Issue Detected:\n"
                     error_msg += f"Expected DLL location: {expected_dll_path}\n"
                     error_msg += f"Exists: {os.path.exists(expected_dll_path)}\n\n"
                     error_msg += f"This may occur in VDI/virtual app environments where paths are redirected.\n\n"
             
+            ansys_root = self._get_ansys_root() if self.version else "C:\\Program Files\\ANSYS Inc\\vXXX"
             error_msg += f"Troubleshooting:\n"
-            error_msg += f"1. Verify ANSYS is installed at: C:\\Program Files\\ANSYS Inc\\v{self.version if self.version else 'XXX'}\\\n"
+            error_msg += f"1. Verify ANSYS is installed at: {ansys_root}\n"
             error_msg += f"2. Try selecting a different ANSYS version from the dropdown\n"
             error_msg += f"3. Check that you have the correct ansys-mechanical-core package version\n"
             error_msg += f"4. In VDI environments, ensure ANSYS is installed locally, not as a virtual app\n\n"

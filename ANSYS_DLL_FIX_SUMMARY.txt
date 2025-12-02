@@ -1,5 +1,5 @@
 ================================================================================
-ANSYS DLL PATH ISSUE FIX - SUMMARY
+ANSYS DLL PATH ISSUE FIX - SUMMARY (Updated with Multi-Drive Support)
 ================================================================================
 
 PROBLEM:
@@ -12,6 +12,11 @@ Instead, the program tried to find the DLL in incorrect paths like:
 
 This occurred even when the correct path existed on the VDI PC.
 
+ADDITIONAL ISSUE:
+-----------------
+Some users have ANSYS installed on drives other than C: (e.g., D:\Program Files\ANSYS Inc)
+The original code only looked in C:\Program Files\ANSYS Inc
+
 ROOT CAUSE:
 -----------
 The ansys-mechanical-core library relies on environment variables to locate 
@@ -23,36 +28,39 @@ environment variables may be:
 
 SOLUTION:
 ---------
-Modified app/analysis/ansys_exporter.py to:
+Modified TWO files:
 
-1. **Pre-verify DLL existence** before attempting to load Ansys
-   - Checks if the DLL file actually exists at expected path
-   - Provides clear error message if missing
+1. app/controllers/action_handler.py:
+   - Now scans ALL drive letters (C-Z) for ANSYS installations
+   - Checks multiple path patterns per drive:
+     * {Drive}:\Program Files\ANSYS Inc
+     * {Drive}:\ANSYS Inc
+     * {Drive}:\Ansys
+   - Also checks environment variables for ANSYS paths
+   - Dropdown now shows the installation path alongside version
+   - Passes the actual installation path to AnsysExporter
 
-2. **Explicitly set environment variables** that ansys-mechanical-core uses:
-   - AWP_ROOT{version} = C:\Program Files\ANSYS Inc\v{version}
-   - ANSYS{version}_DIR = C:\Program Files\ANSYS Inc\v{version}
-   
-3. **Enhanced error messages** to show:
-   - Expected DLL path
-   - Whether the DLL exists
-   - Specific troubleshooting steps for VDI environments
+2. app/analysis/ansys_exporter.py:
+   - Accepts ansys_base_path parameter to know exact installation location
+   - Pre-verifies DLL existence using the correct path
+   - Sets environment variables with the actual path (not hardcoded C:)
+   - Enhanced error messages show the correct expected path
 
-WHAT CHANGED:
--------------
-File: app/analysis/ansys_exporter.py
+WHAT THE USER SEES NOW:
+-----------------------
+The ANSYS version dropdown now shows:
+  - "ANSYS v232 (C:\Program Files\ANSYS Inc)"
+  - "ANSYS v241 (D:\ANSYS Inc)"
+  - etc.
 
-Added:
-  - _verify_ansys_dll() method - checks DLL exists before initialization
-  - Environment variable setup in _init_ansys_session()
-  - Better error messages with DLL path information
+This makes it clear where each version is installed.
 
 HOW IT FIXES THE PROBLEM:
 --------------------------
-By explicitly setting the AWP_ROOT{version} and ANSYS{version}_DIR environment 
-variables BEFORE calling mech.App(), we tell ansys-mechanical-core exactly 
-where to find the Ansys installation, bypassing any path redirection or 
-virtualization issues.
+1. Multi-drive scanning finds ANSYS regardless of installation location
+2. The actual path is passed through the entire export workflow
+3. Environment variables are set with the CORRECT path (not hardcoded C:)
+4. DLL verification uses the actual path before attempting to load
 
 TESTING:
 --------
@@ -67,13 +75,16 @@ To test if this fixes your issue:
    - Load data
    - Go to Part Loads tab
    - Click "Export to Ansys" button
-   - Select parts and Ansys version
+   - Note: Dropdown now shows installation paths!
+   - Select parts and Ansys version (with correct path)
    - Click Confirm
 
 4. Check console output for:
-   ✓ Found Ansys DLL: C:\Program Files\ANSYS Inc\v{version}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll
-   Set AWP_ROOT{version}=C:\Program Files\ANSYS Inc\v{version}
-   Set ANSYS{version}_DIR=C:\Program Files\ANSYS Inc\v{version}
+   ✓ Found Ansys DLL: {actual_path}\v{version}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll
+   Set AWP_ROOT{version}={actual_path}\v{version}
+   Set ANSYS{version}_DIR={actual_path}\v{version}
+   
+   Where {actual_path} is the real installation location (C:, D:, etc.)
 
 IF IT STILL FAILS:
 ------------------
@@ -93,12 +104,22 @@ Possible scenarios:
 3. Virtual app issue → ANSYS is virtualized and paths are redirected
    Solution: Request local ANSYS installation from IT
 
+PATHS SCANNED:
+--------------
+The program now scans these paths on every drive (C-Z):
+  - {Drive}:\Program Files\ANSYS Inc
+  - {Drive}:\ANSYS Inc  
+  - {Drive}:\Ansys
+
+Plus any paths found in environment variables containing "ANSYS" or "AWP_ROOT".
+
 ADDITIONAL NOTES:
 -----------------
 - This fix does not affect users with normal ANSYS installations
 - The fix is backward compatible
 - No changes needed to the build process
-- Works with all ANSYS versions detected by the dropdown
+- Works with all ANSYS versions detected on any drive
+- Dropdown now shows installation path for clarity
 
 VERIFICATION CHECKLIST:
 -----------------------
@@ -112,4 +133,5 @@ VERIFICATION CHECKLIST:
 ================================================================================
 For main offline plotting fix, see: FIX_COMPLETE_README.md
 ================================================================================
+
 

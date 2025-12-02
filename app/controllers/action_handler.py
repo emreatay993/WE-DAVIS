@@ -24,25 +24,54 @@ class ActionHandler(QtCore.QObject):
         self.main_window = main_window
         self.data_manager = data_manager
 
+    def _get_ansys_base_paths(self):
+        """Returns list of possible ANSYS installation base paths to search."""
+        paths = []
+        
+        # Check all available drive letters
+        for drive in "CDEFGHIJKLMNOPQRSTUVWXYZ":
+            paths.append(rf"{drive}:\Program Files\ANSYS Inc")
+            paths.append(rf"{drive}:\ANSYS Inc")
+            paths.append(rf"{drive}:\Ansys")
+        
+        # Also check environment variables that might point to ANSYS
+        for env_var in os.environ:
+            if 'ANSYS' in env_var.upper() or 'AWP_ROOT' in env_var.upper():
+                env_path = os.environ[env_var]
+                if os.path.isdir(env_path):
+                    # Get parent directory in case env points to version folder
+                    parent = os.path.dirname(env_path)
+                    if parent not in paths:
+                        paths.append(parent)
+                    if env_path not in paths:
+                        paths.append(env_path)
+        
+        return paths
+
     def _get_available_ansys_versions(self):
-        """Scans for available ANSYS versions in the ANSYS Inc directory."""
-        ansys_base_path = r"C:\Program Files\ANSYS Inc"
-        available_versions = []
+        """Scans for available ANSYS versions across all possible installation directories."""
+        available_versions = {}  # version -> base_path mapping
         
-        if os.path.exists(ansys_base_path):
-            try:
-                for item in os.listdir(ansys_base_path):
-                    if item.startswith('v') and os.path.isdir(os.path.join(ansys_base_path, item)):
-                        # Extract version number (e.g., 'v232' -> 232)
-                        version_num = item[1:]  # Remove 'v' prefix
-                        if version_num.isdigit():
-                            available_versions.append(int(version_num))
-            except Exception as e:
-                print(f"Error scanning ANSYS versions: {e}")
+        for ansys_base_path in self._get_ansys_base_paths():
+            if os.path.exists(ansys_base_path):
+                try:
+                    for item in os.listdir(ansys_base_path):
+                        if item.startswith('v') and os.path.isdir(os.path.join(ansys_base_path, item)):
+                            # Extract version number (e.g., 'v232' -> 232)
+                            version_num = item[1:]  # Remove 'v' prefix
+                            if version_num.isdigit():
+                                version = int(version_num)
+                                # Store with the base path (first found wins)
+                                if version not in available_versions:
+                                    available_versions[version] = ansys_base_path
+                except Exception as e:
+                    print(f"Error scanning ANSYS versions in {ansys_base_path}: {e}")
         
-        # Sort versions in descending order (latest first)
-        available_versions.sort(reverse=True)
-        return available_versions
+        # Store the paths for later use
+        self._ansys_version_paths = available_versions
+        
+        # Return sorted list of versions (latest first)
+        return sorted(available_versions.keys(), reverse=True)
 
     def _get_sides_for_export(self):
         """Creates and shows a dialog to select multiple sides for export and ANSYS version."""
@@ -78,10 +107,12 @@ class ActionHandler(QtCore.QObject):
         
         if available_versions:
             for version in available_versions:
-                version_combo.addItem(f"ANSYS v{version}", version)
+                # Store both version and path as tuple in item data
+                base_path = self._ansys_version_paths.get(version, r"C:\Program Files\ANSYS Inc")
+                version_combo.addItem(f"ANSYS v{version} ({base_path})", (version, base_path))
             version_combo.setCurrentIndex(0)  # Select latest version by default
         else:
-            version_combo.addItem("Use Latest Available", None)
+            version_combo.addItem("Use Latest Available", (None, None))
         
         version_layout.addWidget(QLabel("Select ANSYS version for template generation:"))
         version_layout.addWidget(version_combo)
@@ -102,9 +133,9 @@ class ActionHandler(QtCore.QObject):
 
         if dialog.exec_() == QDialog.Accepted:
             selected_sides = [item.text() for item in list_widget.selectedItems()]
-            selected_version = version_combo.currentData()
-            return selected_sides, selected_version
-        return None, None
+            version_data = version_combo.currentData()  # (version, base_path) tuple
+            return selected_sides, version_data
+        return None, (None, None)
 
     @QtCore.pyqtSlot()
     def handle_compare_data_selection(self):
@@ -161,9 +192,11 @@ class ActionHandler(QtCore.QObject):
             QMessageBox.warning(self.main_window, "No Data", "Please load data before exporting.")
             return
 
-        selected_sides, selected_version = self._get_sides_for_export()
+        selected_sides, version_data = self._get_sides_for_export()
         if not selected_sides:
             return
+        
+        selected_version, ansys_base_path = version_data
 
         cols_to_keep = [data_domain]
         for side in selected_sides:
@@ -219,7 +252,7 @@ class ActionHandler(QtCore.QObject):
 
         df_combined_converted.to_csv("extracted_loads_of_all_selected_parts_in_converted_units.csv", index=False)
 
-        exporter = AnsysExporter(version=selected_version)
+        exporter = AnsysExporter(version=selected_version, ansys_base_path=ansys_base_path)
         if data_domain == 'FREQ':
             exporter.create_harmonic_template(df_processed, data_domain)
         elif data_domain == 'TIME':

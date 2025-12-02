@@ -177,3 +177,4 @@ Without the fix, PyInstaller wasn't including the JavaScript file, so Plotly cou
 
 For questions or issues, refer to the main project documentation or contact the development team.
 
+
