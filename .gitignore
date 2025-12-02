@@ -2,3 +2,5 @@
 /.venv/
 /.venv_conda/Scripts/python.exe
 /full_data.csv
+/dist/
+/build/
