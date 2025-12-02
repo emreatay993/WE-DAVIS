@@ -1,0 +1,81 @@
+================================================================================
+WE-DAVIS OFFLINE PLOTTING FIX - QUICK REFERENCE
+================================================================================
+
+PROBLEM:
+--------
+- Plots empty in GUI on offline corporate network
+- Error: "js: uncaught reference error: plotly is not defined"
+- Works fine on internet-connected PC
+
+ROOT CAUSE:
+-----------
+PyInstaller wasn't including Plotly's JavaScript files (plotly.min.js) in the 
+bundled executable, so the offline environment couldn't load the plotting library.
+
+SOLUTION:
+---------
+Updated WE-DAVIS.spec to explicitly include Plotly and endaq data files.
+
+FILES CHANGED:
+--------------
+✓ WE-DAVIS.spec              - Updated to bundle Plotly/endaq resources
+✓ build_offline.bat          - NEW: Easy build script
+✓ test_plotly_offline.py     - NEW: Test script to verify fix
+✓ OFFLINE_BUILD_INSTRUCTIONS.md - NEW: Detailed instructions
+
+HOW TO BUILD FOR OFFLINE USE:
+------------------------------
+
+OLD WAY (DON'T USE):
+  pyinstaller --onedir -w --name "WE-DAVIS" main.py --clean --noconfirm
+
+NEW WAY (USE THIS):
+  build_offline.bat
+  
+  OR
+  
+  pyinstaller WE-DAVIS.spec --clean --noconfirm
+
+HOW TO TEST BEFORE TRANSFERRING:
+---------------------------------
+1. Run: build_offline.bat
+2. Disconnect from internet
+3. Run: dist\WE-DAVIS\WE-DAVIS.exe
+4. Load data and verify plots work
+5. If working, reconnect and transfer to offline network
+
+WHAT TO TRANSFER:
+-----------------
+Transfer the ENTIRE folder: dist\WE-DAVIS\
+
+This includes:
+- WE-DAVIS.exe
+- _internal\ folder (contains all dependencies including plotly.min.js)
+
+DO NOT transfer only the .exe file!
+
+VERIFICATION CHECKLIST:
+-----------------------
+□ Built using WE-DAVIS.spec (not simple pyinstaller command)
+□ dist\WE-DAVIS\_internal\ folder exists and is large
+□ Tested offline on local machine before transfer
+□ Transferred entire dist\WE-DAVIS\ folder (not just .exe)
+□ No internet connection on target machine when testing
+
+TROUBLESHOOTING:
+----------------
+If still seeing "plotly is not defined":
+  → Rebuild using WE-DAVIS.spec
+  → Ensure _internal folder was transferred
+  → Check build output for errors
+
+If plots still empty:
+  → Run test_plotly_offline.py on dev machine
+  → Check console output for JavaScript errors
+  → Verify requirements.txt packages are installed
+
+================================================================================
+For detailed instructions, see: OFFLINE_BUILD_INSTRUCTIONS.md
+================================================================================
+
