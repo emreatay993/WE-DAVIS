@@ -1,0 +1,115 @@
+================================================================================
+ANSYS DLL PATH ISSUE FIX - SUMMARY
+================================================================================
+
+PROBLEM:
+--------
+Users in corporate VDI environments reported error when using Ansys export:
+  "Could not find C:\Program Files\ANSYS Inc\v232\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
+  
+Instead, the program tried to find the DLL in incorrect paths like:
+  "D:\{Random_String}\Program File\ANSYS Inc\v232\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
+
+This occurred even when the correct path existed on the VDI PC.
+
+ROOT CAUSE:
+-----------
+The ansys-mechanical-core library relies on environment variables to locate 
+the Ansys installation. In VDI environments with virtual applications, these 
+environment variables may be:
+  - Not set correctly
+  - Point to temporary/redirected paths
+  - Be overridden by virtualization software
+
+SOLUTION:
+---------
+Modified app/analysis/ansys_exporter.py to:
+
+1. **Pre-verify DLL existence** before attempting to load Ansys
+   - Checks if the DLL file actually exists at expected path
+   - Provides clear error message if missing
+
+2. **Explicitly set environment variables** that ansys-mechanical-core uses:
+   - AWP_ROOT{version} = C:\Program Files\ANSYS Inc\v{version}
+   - ANSYS{version}_DIR = C:\Program Files\ANSYS Inc\v{version}
+   
+3. **Enhanced error messages** to show:
+   - Expected DLL path
+   - Whether the DLL exists
+   - Specific troubleshooting steps for VDI environments
+
+WHAT CHANGED:
+-------------
+File: app/analysis/ansys_exporter.py
+
+Added:
+  - _verify_ansys_dll() method - checks DLL exists before initialization
+  - Environment variable setup in _init_ansys_session()
+  - Better error messages with DLL path information
+
+HOW IT FIXES THE PROBLEM:
+--------------------------
+By explicitly setting the AWP_ROOT{version} and ANSYS{version}_DIR environment 
+variables BEFORE calling mech.App(), we tell ansys-mechanical-core exactly 
+where to find the Ansys installation, bypassing any path redirection or 
+virtualization issues.
+
+TESTING:
+--------
+To test if this fixes your issue:
+
+1. Build the updated application:
+   build_offline.bat
+
+2. Transfer to VDI environment
+
+3. Try the Ansys export:
+   - Load data
+   - Go to Part Loads tab
+   - Click "Export to Ansys" button
+   - Select parts and Ansys version
+   - Click Confirm
+
+4. Check console output for:
+   ✓ Found Ansys DLL: C:\Program Files\ANSYS Inc\v{version}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll
+   Set AWP_ROOT{version}=C:\Program Files\ANSYS Inc\v{version}
+   Set ANSYS{version}_DIR=C:\Program Files\ANSYS Inc\v{version}
+
+IF IT STILL FAILS:
+------------------
+The error message will now show:
+  - The exact DLL path being looked for
+  - Whether the file exists or not
+  - Specific troubleshooting steps
+
+Possible scenarios:
+
+1. DLL doesn't exist → ANSYS not properly installed
+   Solution: Install ANSYS locally (not as virtual app)
+
+2. DLL exists but still fails → Permissions or access issue
+   Solution: Run as administrator or check file permissions
+
+3. Virtual app issue → ANSYS is virtualized and paths are redirected
+   Solution: Request local ANSYS installation from IT
+
+ADDITIONAL NOTES:
+-----------------
+- This fix does not affect users with normal ANSYS installations
+- The fix is backward compatible
+- No changes needed to the build process
+- Works with all ANSYS versions detected by the dropdown
+
+VERIFICATION CHECKLIST:
+-----------------------
+□ Application rebuilt with updated code
+□ Ansys export button clicked
+□ Version selected from dropdown
+□ Console shows "✓ Found Ansys DLL" message
+□ Environment variables set (check console output)
+□ Ansys initializes successfully
+
+================================================================================
+For main offline plotting fix, see: FIX_COMPLETE_README.md
+================================================================================
+

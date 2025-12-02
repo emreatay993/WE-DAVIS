@@ -26,13 +26,53 @@ class AnsysExporter:
         self.Ansys = None
         self.version = version  # Store the ANSYS version to use
 
+    def _verify_ansys_dll(self):
+        """Verifies that the required Ansys DLL exists before initialization."""
+        if self.version is None:
+            return True  # Let ansys-mechanical-core find latest version
+        
+        dll_path = rf"C:\Program Files\ANSYS Inc\v{self.version}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
+        if os.path.exists(dll_path):
+            print(f"✓ Found Ansys DLL: {dll_path}")
+            return True
+        else:
+            print(f"✗ DLL not found: {dll_path}")
+            QMessageBox.critical(None, 'Ansys DLL Not Found',
+                                 f"Cannot find required Ansys DLL:\n\n{dll_path}\n\n"
+                                 f"This may occur if:\n"
+                                 f"• ANSYS v{self.version} is not installed\n"
+                                 f"• ANSYS is installed as a virtual app (VDI)\n"
+                                 f"• ANSYS installation is incomplete\n\n"
+                                 f"Solutions:\n"
+                                 f"1. Try selecting a different ANSYS version\n"
+                                 f"2. Verify ANSYS is installed at: C:\\Program Files\\ANSYS Inc\\v{self.version}\\")
+            return False
+
     def _init_ansys_session(self):
         """Initializes a new Ansys Mechanical session."""
         try:
+            # Verify DLL exists before attempting to load
+            if not self._verify_ansys_dll():
+                return False
+            
             print("Importing ansys-mechanical-core library...")
             import ansys.mechanical.core as mech
             from ansys.mechanical.core import global_variables
             print("Imported.")
+
+            # Set Ansys installation path explicitly to avoid VDI/virtual app path issues
+            if self.version is not None:
+                ansys_root = rf"C:\Program Files\ANSYS Inc\v{self.version}"
+                if os.path.exists(ansys_root):
+                    # Set environment variables that ansys-mechanical-core uses to find DLLs
+                    os.environ[f'AWP_ROOT{self.version}'] = ansys_root
+                    print(f"Set AWP_ROOT{self.version}={ansys_root}")
+                    
+                    # Also set ANSYS{version}_DIR which some versions might need
+                    os.environ[f'ANSYS{self.version}_DIR'] = ansys_root
+                    print(f"Set ANSYS{self.version}_DIR={ansys_root}")
+                else:
+                    print(f"Warning: Ansys installation path not found: {ansys_root}")
 
             print("Starting Ansys Mechanical...")
             # Initialize App with version if specified
@@ -55,11 +95,28 @@ class AnsysExporter:
             return True
         except Exception as e:
             version_text = f" (version {self.version})" if self.version else ""
-            QMessageBox.critical(None, 'Ansys Error',
-                                 f"The selected ANSYS version{version_text} is not supported or produced errors during initialization.\n\n"
-                                 f"Please check that the selected version is installed properly and supports the export operation.\n\n"
-                                 f"You may try selecting a different ANSYS version from the dropdown menu.\n\n"
-                                 f"Error details: {e}")
+            
+            # Build detailed error message
+            error_msg = f"The selected ANSYS version{version_text} is not supported or produced errors during initialization.\n\n"
+            
+            # Check if it's a DLL path issue
+            error_str = str(e).lower()
+            if 'dll' in error_str or 'could not find' in error_str or 'file not found' in error_str:
+                if self.version:
+                    expected_dll_path = rf"C:\Program Files\ANSYS Inc\v{self.version}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
+                    error_msg += f"DLL Loading Issue Detected:\n"
+                    error_msg += f"Expected DLL location: {expected_dll_path}\n"
+                    error_msg += f"Exists: {os.path.exists(expected_dll_path)}\n\n"
+                    error_msg += f"This may occur in VDI/virtual app environments where paths are redirected.\n\n"
+            
+            error_msg += f"Troubleshooting:\n"
+            error_msg += f"1. Verify ANSYS is installed at: C:\\Program Files\\ANSYS Inc\\v{self.version if self.version else 'XXX'}\\\n"
+            error_msg += f"2. Try selecting a different ANSYS version from the dropdown\n"
+            error_msg += f"3. Check that you have the correct ansys-mechanical-core package version\n"
+            error_msg += f"4. In VDI environments, ensure ANSYS is installed locally, not as a virtual app\n\n"
+            error_msg += f"Error details: {e}"
+            
+            QMessageBox.critical(None, 'Ansys Initialization Error', error_msg)
             return False
 
     def _close_ansys_session(self):
