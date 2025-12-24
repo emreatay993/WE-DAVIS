@@ -59,13 +59,19 @@ class PlotController(QtCore.QObject):
         Returns a sorted list of data columns that are present in
         BOTH the primary and comparison dataframes.
         """
+        df = self._get_df()
         df_compare = self._get_compare_df()
-        # Get data columns from the *primary* dataframe (this already filters domain col)
-        data_cols_primary = self.data_manager.get_data_columns(include_phase=True)
 
-        if data_cols_primary is None:
+        if df is None:
             # If primary isn't loaded, return empty
             return []
+
+        # Get data columns from the primary dataframe (exclude metadata columns)
+        excluded_cols = {'FREQ', 'TIME', 'NO', 'DataFolder'}
+        data_cols_primary = [
+            col for col in df.columns
+            if col not in excluded_cols and not col.startswith('Phase_')
+        ]
 
         if df_compare is None:
             # If compare isn't loaded, just return all primary columns
