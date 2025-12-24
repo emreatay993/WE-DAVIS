@@ -130,6 +130,30 @@ class MainWindow(QMainWindow):
         self.tab_part_loads.export_to_ansys_requested.connect(self.action_handler.handle_ansys_export)
         self.tab_time_domain_represent.extract_data_requested.connect(self.action_handler.handle_time_domain_represent_export)
 
+        # Tab Change Signal (Refresh plots when tab becomes active)
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
+
+    @QtCore.pyqtSlot(int)
+    def _on_tab_changed(self, index):
+        """Refresh the plot for the newly active tab."""
+        if self.df is None:
+            return
+
+        current_tab = self.tab_widget.widget(index)
+
+        if current_tab == self.tab_single_data:
+            self.plot_controller.update_single_data_plots()
+        elif current_tab == self.tab_interface_data:
+            self.plot_controller.update_interface_data_plots()
+        elif current_tab == self.tab_part_loads:
+            self.plot_controller.update_part_loads_plots()
+        elif current_tab == self.tab_time_domain_represent:
+            self.plot_controller.update_time_domain_represent_plot()
+        elif current_tab == self.tab_compare_data:
+            self.plot_controller.update_compare_data_plots()
+        elif current_tab == self.tab_compare_part_loads:
+            self.plot_controller.update_compare_part_loads_plots()
+
     def _handle_time_domain_tab_visibility(self):
         is_present = self.tab_widget.indexOf(self.tab_time_domain_represent) != -1
         if self.data_domain == 'FREQ' and not is_present:
