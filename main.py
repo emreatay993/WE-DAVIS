@@ -1,5 +1,10 @@
 # File: main.py
 import sys
+import logging
+
+# Suppress third-party logging (e.g., Titus/log4net)
+logging.getLogger().setLevel(logging.CRITICAL)
+
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QTimer
