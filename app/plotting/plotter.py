@@ -45,11 +45,11 @@ class Plotter:
         """Toggles the legend's visibility on or off."""
         self.legend_visible = not self.legend_visible
     
-    def _get_hover_template(self, index_name):
-        """Generates the custom hovertemplate string based on the data domain."""
-        is_freq_domain = 'freq' in index_name.lower()
-        domain_label = 'Hz' if is_freq_domain else 'Time'
-        return f"%{{fullData.name}}<br>{domain_label}: %{{x}}<br>Value: %{{y:.3f}}<extra></extra>"
+    def _get_hover_template(self, index_name, y_unit=None):
+        """Generates the custom hovertemplate string based on the projected axis labels."""
+        x_label = index_name or "X"
+        value_label = f"Value [{y_unit}]" if y_unit else "Value"
+        return f"%{{fullData.name}}<br>{x_label}: %{{x}}<br>{value_label}: %{{y:.3f}}<extra></extra>"
 
     def create_standard_figure(self, data_to_plot, title, y_axis_title="Value"):
         """
@@ -64,8 +64,12 @@ class Plotter:
             if data_to_plot.empty:
                 return go.Figure()
 
-            hover_template = self._get_hover_template(data_to_plot.index.name)
+            trace_units = data_to_plot.attrs.get("trace_units", {})
             for column_name in data_to_plot.columns:
+                hover_template = self._get_hover_template(
+                    data_to_plot.index.name,
+                    trace_units.get(column_name),
+                )
                 fig.add_trace(go.Scatter(
                     x=data_to_plot.index,
                     y=data_to_plot[column_name],
@@ -86,9 +90,13 @@ class Plotter:
                 if df is None or df.empty:
                     continue
 
-                hover_template = self._get_hover_template(df.index.name)
+                trace_units = df.attrs.get("trace_units", {})
                 # This logic assumes each DataFrame in the dict has only one data column
                 col_name = df.columns[0]
+                hover_template = self._get_hover_template(
+                    df.index.name,
+                    trace_units.get(col_name) or trace_units.get(trace_name),
+                )
 
                 fig.add_trace(go.Scatter(
                     x=df.index,
@@ -142,16 +150,17 @@ class Plotter:
         self._apply_standard_layout(fig, f"Spectrum Plot ({plot_type})", "Frequency (Hz)", "Time (s)")
         return fig
 
-    def create_comparison_figure(self, df1, df2, column, title):
+    def create_comparison_figure(self, df1, df2, column, title, y_axis_title="Value"):
         fig = go.Figure()
         x_label = df1.index.name
-        hover_template = self._get_hover_template(x_label)
+        y_unit_1 = df1.attrs.get("trace_units", {}).get(column)
+        y_unit_2 = df2.attrs.get("trace_units", {}).get(column)
 
         fig.add_trace(go.Scatter(
             x=df1.index,
             y=df1[column],
             name=f"Original - {column}",
-            hovertemplate=hover_template,
+            hovertemplate=self._get_hover_template(x_label, y_unit_1),
             opacity=self.trace_opacity
         ))
 
@@ -159,30 +168,30 @@ class Plotter:
             x=df2.index,
             y=df2[column],
             name=f"Compare - {column}",
-            hovertemplate=hover_template,
+            hovertemplate=self._get_hover_template(x_label, y_unit_2),
             opacity=self.trace_opacity
         ))
 
-        self._apply_standard_layout(fig, title, x_label, "Value")
+        self._apply_standard_layout(fig, title, x_label, y_axis_title)
         return fig
 
     def create_difference_figure(self, diff_df, title, y_title):
         fig = go.Figure()
-        hover_template = self._get_hover_template(diff_df.index.name)
+        trace_units = diff_df.attrs.get("trace_units", {})
 
         for col in diff_df.columns:
             fig.add_trace(go.Scatter(
                 x=diff_df.index,
                 y=diff_df[col],
                 name=col,
-                hovertemplate=hover_template,
+                hovertemplate=self._get_hover_template(diff_df.index.name, trace_units.get(col)),
                 opacity=self.trace_opacity
             ))
 
         self._apply_standard_layout(fig, title, diff_df.index.name, y_title)
         return fig
 
-    def create_rolling_envelope_figure(self, df_dict, title, desired_num_points, plot_as_bars):
+    def create_rolling_envelope_figure(self, df_dict, title, desired_num_points, plot_as_bars, y_axis_title="Value"):
         if not df_dict:
             return go.Figure()
 
@@ -199,14 +208,18 @@ class Plotter:
             desired_num_points=desired_num_points,
             plot_as_bars=plot_as_bars
         )
+        x_axis_title = list(df_dict.values())[0].index.name
         # Ensure all traces reflect global opacity regardless of how the helper sets them
         for trace in fig.data:
             try:
                 trace.opacity = self.trace_opacity
+                source_df = df_dict.get(trace.name)
+                trace_units = {} if source_df is None else source_df.attrs.get("trace_units", {})
+                trace_unit = None if source_df is None else trace_units.get(source_df.columns[0]) or trace_units.get(trace.name)
+                trace.hovertemplate = self._get_hover_template(x_axis_title, trace_unit)
             except Exception:
                 pass
-        x_axis_title = list(df_dict.values())[0].index.name
-        self._apply_standard_layout(fig, title, x_axis_title, "Value")
+        self._apply_standard_layout(fig, title, x_axis_title, y_axis_title)
         return fig
 
     def _apply_standard_layout(self, fig, title, x_axis_title, y_axis_title):
