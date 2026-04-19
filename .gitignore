@@ -4,3 +4,12 @@
 /full_data.csv
 /dist/
 /build/
+
+# Local development artifacts
+.vscode/
+__pycache__/
+*.py[cod]
+/extracted*.csv
+/WE_Loading_Template_Harmonic.mechdat
+/scripts/count_lines.py
+/scripts/disable_plot_right_click_menus.py
