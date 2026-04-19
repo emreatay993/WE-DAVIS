@@ -21,16 +21,13 @@ if __name__ == "__main__":
     data_manager = DataManager()
     main_window = MainWindow(data_manager)
 
-    # 3. Connect the signal from the data_manager to the slot in the main_window
-    data_manager.dataLoaded.connect(main_window.on_data_loaded)
-
-    # 4. Show the main window
+    # 3. Show the main window
     main_window.showMaximized()
 
-    # 5. Trigger the initial data loading process.
+    # 4. Trigger the initial data loading process.
     # QTimer is used to ensure the main window is fully shown before the blocking
     # file dialog appears (for better user experience).
     QTimer.singleShot(100, data_manager.load_data_from_directory)
 
-    # 6. Start the application's event loop
+    # 5. Start the application's event loop
     sys.exit(app.exec_())

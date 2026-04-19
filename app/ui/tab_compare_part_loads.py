@@ -41,6 +41,16 @@ class ComparePartLoadsTab(QtWidgets.QWidget):
         self.side_filter_selector.currentIndexChanged.connect(self.plot_parameters_changed)
         self.exclude_checkbox.stateChanged.connect(self.plot_parameters_changed)
 
+    def set_available_sides(self, sides, preserve_selection=True):
+        current_side = self.side_filter_selector.currentText() if preserve_selection else ""
+        self.side_filter_selector.blockSignals(True)
+        self.side_filter_selector.clear()
+        self.side_filter_selector.addItems(sides)
+        if sides:
+            target_side = current_side if current_side in sides else sides[0]
+            self.side_filter_selector.setCurrentIndex(self.side_filter_selector.findText(target_side))
+        self.side_filter_selector.blockSignals(False)
+
     def display_t_series_plot(self, fig):
         load_fig_to_webview(fig, self.t_series_plot)
 

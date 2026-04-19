@@ -99,6 +99,16 @@ class PartLoadsTab(QtWidgets.QWidget):
             self.section_max_label.setVisible(False)
             self.section_max_input.setVisible(False)
 
+    def set_available_sides(self, sides, preserve_selection=True):
+        current_side = self.side_filter_selector.currentText() if preserve_selection else ""
+        self.side_filter_selector.blockSignals(True)
+        self.side_filter_selector.clear()
+        self.side_filter_selector.addItems(sides)
+        if sides:
+            target_side = current_side if current_side in sides else sides[0]
+            self.side_filter_selector.setCurrentIndex(self.side_filter_selector.findText(target_side))
+        self.side_filter_selector.blockSignals(False)
+
     @QtCore.pyqtSlot(int)
     def _on_tukey_toggled(self, state):
         self.tukey_alpha_spin.setVisible(state == QtCore.Qt.Checked)

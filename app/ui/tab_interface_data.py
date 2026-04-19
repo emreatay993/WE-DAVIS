@@ -18,6 +18,26 @@ class InterfaceDataTab(QtWidgets.QWidget):
         """MainWindow provides the dataframe to this tab."""
         self.df = df
 
+    def refresh_selectors(self, preserve_selection=True):
+        """Rebuild interface and side selectors from the current dataframe."""
+        if self.df is None:
+            self._set_combo_items(self.interface_selector, [], "")
+            self._set_combo_items(self.side_selector, [], "")
+            return
+
+        previous_interface = self.interface_selector.currentText() if preserve_selection else ""
+        previous_side = self.side_selector.currentText() if preserve_selection else ""
+
+        interfaces = self._extract_interfaces()
+        selected_interface = self._set_combo_items(
+            self.interface_selector,
+            interfaces,
+            previous_interface,
+        )
+
+        sides = self._get_sides_for_interface(selected_interface)
+        self._set_combo_items(self.side_selector, sides, previous_side)
+
     def _setup_ui(self):
         # Widgets
         self.interface_selector = QComboBox()
@@ -58,22 +78,51 @@ class InterfaceDataTab(QtWidgets.QWidget):
 
     # Helper methods to call
     def _populate_side_selector(self):
-        if self.df is None:
-            return
-
         current_interface = self.interface_selector.currentText()
-        if not current_interface:
-            self.side_selector.clear()
-            return
+        current_side = self.side_selector.currentText()
+        sides = self._get_sides_for_interface(current_interface)
+        self._set_combo_items(self.side_selector, sides, current_side)
+
+    def _extract_interfaces(self):
+        return natsorted(
+            list(
+                {
+                    match.group(0)
+                    for col in self.df.columns
+                    if (match := re.match(r'I\d+[A-Za-z]?', col.split(' ')[0]))
+                }
+            )
+        )
+
+    def _get_sides_for_interface(self, interface_name):
+        if self.df is None or not interface_name:
+            return []
 
         pattern = re.compile(r'I\d+[a-zA-Z]?\s*-\s*(.*?)(?=\s*\()')
-        relevant_cols = [col for col in self.df.columns if re.match(rf"^{re.escape(current_interface)}(?=\D)", col)]
-        sides = sorted(set(pattern.search(col).group(1).strip() for col in relevant_cols if pattern.search(col)))
+        relevant_cols = [
+            col for col in self.df.columns
+            if re.match(rf"^{re.escape(interface_name)}(?=\D)", col)
+        ]
+        return sorted(
+            {
+                match.group(1).strip()
+                for col in relevant_cols
+                if (match := pattern.search(col))
+            }
+        )
 
-        self.side_selector.blockSignals(True)
-        self.side_selector.clear()
-        self.side_selector.addItems(sides)
-        self.side_selector.blockSignals(False)
+    @staticmethod
+    def _set_combo_items(combo_box, items, selected_text):
+        combo_box.blockSignals(True)
+        combo_box.clear()
+        combo_box.addItems(items)
+
+        if items:
+            target_text = selected_text if selected_text in items else items[0]
+            combo_box.setCurrentIndex(combo_box.findText(target_text))
+
+        combo_box.blockSignals(False)
+        return combo_box.currentText()
 
     def display_t_series_plot(self, fig):
         load_fig_to_webview(fig, self.t_series_plot)

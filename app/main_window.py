@@ -3,7 +3,6 @@
 import os
 import re
 import pandas as pd
-from natsort import natsorted
 
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QMenuBar, QMenu, QAction, QMessageBox)
@@ -164,12 +163,11 @@ class MainWindow(QMainWindow):
     def _populate_all_selectors(self):
         if self.df is None: return
 
+        self.tab_interface_data.refresh_selectors()
+
         # Block signals on all selectors to prevent triggering plot updates during population
         selectors_to_block = [
             self.tab_single_data.column_selector,
-            self.tab_interface_data.interface_selector,
-            self.tab_part_loads.side_filter_selector,
-            self.tab_compare_part_loads.side_filter_selector,
         ]
         
         if self.data_domain == 'FREQ':
@@ -189,17 +187,12 @@ class MainWindow(QMainWindow):
             self.tab_single_data.column_selector.addItem(self.plot_controller.TIME_STEP_LABEL)
             self.tab_single_data.column_selector.addItem(self.plot_controller.FS_LABEL)
 
-        # Interface Data Tab
-        interfaces = natsorted(list(set(re.match(r'I\d+[A-Za-z]?', c.split(' ')[0]).group(0) for c in self.df.columns if re.match(r'I\d+[A-Za-z]?', c.split(' ')[0]))))
-        self.tab_interface_data.interface_selector.clear()
-        self.tab_interface_data.interface_selector.addItems(interfaces)
+        # Interface Data Tab refresh is delegated to the tab itself.
 
         # Part Loads & Compare Part Loads Tabs
         sides = sorted(list(set(m.group(1).strip() for c in self.df.columns if not c.startswith('Phase_') and (m := re.search(r'(?<=\s-)(.*?)(?=\s*\()', c)))))
-        self.tab_part_loads.side_filter_selector.clear()
-        self.tab_part_loads.side_filter_selector.addItems(sides)
-        self.tab_compare_part_loads.side_filter_selector.clear()
-        self.tab_compare_part_loads.side_filter_selector.addItems(sides)
+        self.tab_part_loads.set_available_sides(sides)
+        self.tab_compare_part_loads.set_available_sides(sides)
 
         # Time Domain Tab
         if self.data_domain == 'FREQ':
