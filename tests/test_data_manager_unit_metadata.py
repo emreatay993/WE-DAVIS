@@ -205,6 +205,34 @@ class DataManagerUnitMetadataTests(unittest.TestCase):
         self.assertTrue(unit_context["Extra_Column_1"].native_only)
         self.assertIsNone(unit_context["Extra_Column_1"].normalized_unit)
 
+    def test_loader_detects_units_from_max_pld_without_using_component_suffixes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            self._write_pld_files(
+                temp_path,
+                full_text="""
+                | NO | FREQ | Y1 | Y2 | Y3 | Y4 |
+                __________________________________
+                | 1 | 1.0 | 0.25 | 0.00 | 5.0 | 0.50 |
+                | 2 | 2.0 | 0.50 | 0.25 | 6.0 | 0.75 |
+                """,
+                max_text="""
+                | Interface Label | UNIT | MAGNITUDE | PHASE(rad) | FREQ(kHz) |
+                ________________________________________________________________
+                | Custom Channel T1 | m | 0.25 | 0.00 | 1.0 |
+                | Custom Channel R1 | N | 5.0 | 0.50 | 1.0 |
+                """,
+            )
+
+            data, data_domain, _, unit_context = self._load_primary_folder(temp_path)
+
+        self.assertEqual(data_domain, "FREQ")
+        self.assertEqual(list(unit_context), list(data.columns))
+        self.assertEqual(unit_context["FREQ"].normalized_unit, "kHz")
+        self.assertEqual(unit_context["Phase_Custom Channel T1"].normalized_unit, "rad")
+        self.assertEqual(unit_context["Custom Channel T1"].quantity_family, "displacement")
+        self.assertEqual(unit_context["Custom Channel R1"].quantity_family, "force")
+
     def _load_primary_folder(self, folder: Path):
         emitted = []
         failures = []

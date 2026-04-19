@@ -1,24 +1,43 @@
 from __future__ import annotations
 
+import sys
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 
+def _drop_stubbed_modules(*module_names: str) -> None:
+    for module_name in module_names:
+        module = sys.modules.get(module_name)
+        if module is not None and not getattr(module, "__file__", None):
+            del sys.modules[module_name]
+            parent_name, _, child_name = module_name.rpartition(".")
+            parent_module = sys.modules.get(parent_name)
+            if parent_module is not None and hasattr(parent_module, child_name):
+                delattr(parent_module, child_name)
+
+
+def _reset_modules(*module_names: str) -> None:
+    for module_name in module_names:
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+        parent_name, _, child_name = module_name.rpartition(".")
+        parent_module = sys.modules.get(parent_name)
+        if parent_module is not None and hasattr(parent_module, child_name):
+            delattr(parent_module, child_name)
+
+
 try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import QMessageBox
 except ModuleNotFoundError:
-    import sys
-    from types import ModuleType
-
     def _install_pyqt5_stub() -> None:
-        pyqt5_module = ModuleType("PyQt5")
-        qtcore_module = ModuleType("PyQt5.QtCore")
-        qtwidgets_module = ModuleType("PyQt5.QtWidgets")
+        pyqt5_module = sys.modules.get("PyQt5", ModuleType("PyQt5"))
+        qtcore_module = sys.modules.get("PyQt5.QtCore", ModuleType("PyQt5.QtCore"))
+        qtwidgets_module = sys.modules.get("PyQt5.QtWidgets", ModuleType("PyQt5.QtWidgets"))
 
         class _BoundSignal:
             def __init__(self) -> None:
@@ -90,13 +109,13 @@ except ModuleNotFoundError:
             def information(*args, **kwargs):
                 return None
 
-        qtcore_module.QObject = QObject
-        qtcore_module.QCoreApplication = QCoreApplication
-        qtcore_module.QUrl = QUrl
-        qtcore_module.pyqtSignal = pyqtSignal
-        qtcore_module.pyqtSlot = pyqtSlot
-        qtwidgets_module.QFileDialog = QFileDialog
-        qtwidgets_module.QMessageBox = QMessageBox
+        qtcore_module.QObject = getattr(qtcore_module, "QObject", QObject)
+        qtcore_module.QCoreApplication = getattr(qtcore_module, "QCoreApplication", QCoreApplication)
+        qtcore_module.QUrl = getattr(qtcore_module, "QUrl", QUrl)
+        qtcore_module.pyqtSignal = getattr(qtcore_module, "pyqtSignal", pyqtSignal)
+        qtcore_module.pyqtSlot = getattr(qtcore_module, "pyqtSlot", pyqtSlot)
+        qtwidgets_module.QFileDialog = getattr(qtwidgets_module, "QFileDialog", QFileDialog)
+        qtwidgets_module.QMessageBox = getattr(qtwidgets_module, "QMessageBox", QMessageBox)
 
         pyqt5_module.QtCore = qtcore_module
         pyqt5_module.QtWidgets = qtwidgets_module
@@ -107,13 +126,73 @@ except ModuleNotFoundError:
     _install_pyqt5_stub()
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import QMessageBox
+else:
+    if not hasattr(QtCore, "QCoreApplication") or not hasattr(QtCore, "QUrl"):
+        def _install_pyqt5_stub() -> None:
+            pyqt5_module = sys.modules.get("PyQt5", ModuleType("PyQt5"))
+            qtcore_module = sys.modules.get("PyQt5.QtCore", ModuleType("PyQt5.QtCore"))
+            qtwidgets_module = sys.modules.get("PyQt5.QtWidgets", ModuleType("PyQt5.QtWidgets"))
+
+            class QCoreApplication:
+                _instance = None
+
+                def __init__(self, args=None) -> None:
+                    QCoreApplication._instance = self
+
+                @classmethod
+                def instance(cls):
+                    return cls._instance
+
+            class QUrl:
+                @staticmethod
+                def fromLocalFile(path):
+                    return path
+
+            class QFileDialog:
+                @staticmethod
+                def getExistingDirectory(*args, **kwargs):
+                    return ""
+
+            class QMessageBox:
+                @staticmethod
+                def warning(*args, **kwargs):
+                    return None
+
+                @staticmethod
+                def critical(*args, **kwargs):
+                    return None
+
+                @staticmethod
+                def information(*args, **kwargs):
+                    return None
+
+            qtcore_module.QCoreApplication = getattr(qtcore_module, "QCoreApplication", QCoreApplication)
+            qtcore_module.QUrl = getattr(qtcore_module, "QUrl", QUrl)
+            qtwidgets_module.QFileDialog = getattr(qtwidgets_module, "QFileDialog", QFileDialog)
+            qtwidgets_module.QMessageBox = getattr(qtwidgets_module, "QMessageBox", QMessageBox)
+            pyqt5_module.QtCore = qtcore_module
+            pyqt5_module.QtWidgets = qtwidgets_module
+            sys.modules["PyQt5"] = pyqt5_module
+            sys.modules["PyQt5.QtCore"] = qtcore_module
+            sys.modules["PyQt5.QtWidgets"] = qtwidgets_module
+
+        _install_pyqt5_stub()
+        from PyQt5 import QtCore
+        from PyQt5.QtWidgets import QMessageBox
+
+_drop_stubbed_modules(
+    "plotly",
+    "plotly.graph_objects",
+    "plotly.io",
+    "endaq",
+    "endaq.calc",
+    "endaq.calc.fft",
+    "endaq.plot",
+)
 
 try:
     import plotly.graph_objects  # noqa: F401
 except ModuleNotFoundError:
-    import sys
-    from types import ModuleType
-
     def _install_plotly_and_endaq_stubs() -> None:
         plotly_module = ModuleType("plotly")
         graph_objects_module = ModuleType("plotly.graph_objects")
@@ -202,9 +281,6 @@ except ModuleNotFoundError:
 try:
     import scipy.signal  # noqa: F401
 except ModuleNotFoundError:
-    import sys
-    from types import ModuleType
-
     def _install_scipy_stub() -> None:
         scipy_module = ModuleType("scipy")
         signal_module = ModuleType("scipy.signal")
@@ -230,6 +306,12 @@ except ModuleNotFoundError:
         sys.modules["scipy.signal.windows"] = windows_module
 
     _install_scipy_stub()
+
+_reset_modules(
+    "app.analysis.data_processing",
+    "app.plotting.plotter",
+    "app.controllers.plot_controller",
+)
 
 from app.controllers.plot_controller import PlotController
 from app.data_manager import DataManager

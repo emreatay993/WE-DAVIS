@@ -10,13 +10,31 @@ from unittest.mock import patch
 import pandas as pd
 
 
-def _install_pyqt5_stub() -> None:
-    if "PyQt5" in sys.modules:
-        return
+def _drop_stubbed_modules(*module_names: str) -> None:
+    for module_name in module_names:
+        module = sys.modules.get(module_name)
+        if module is not None and not getattr(module, "__file__", None):
+            del sys.modules[module_name]
+            parent_name, _, child_name = module_name.rpartition(".")
+            parent_module = sys.modules.get(parent_name)
+            if parent_module is not None and hasattr(parent_module, child_name):
+                delattr(parent_module, child_name)
 
-    pyqt5_module = ModuleType("PyQt5")
-    qtcore_module = ModuleType("PyQt5.QtCore")
-    qtwidgets_module = ModuleType("PyQt5.QtWidgets")
+
+def _reset_modules(*module_names: str) -> None:
+    for module_name in module_names:
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+        parent_name, _, child_name = module_name.rpartition(".")
+        parent_module = sys.modules.get(parent_name)
+        if parent_module is not None and hasattr(parent_module, child_name):
+            delattr(parent_module, child_name)
+
+
+def _install_pyqt5_stub() -> None:
+    pyqt5_module = sys.modules.get("PyQt5", ModuleType("PyQt5"))
+    qtcore_module = sys.modules.get("PyQt5.QtCore", ModuleType("PyQt5.QtCore"))
+    qtwidgets_module = sys.modules.get("PyQt5.QtWidgets", ModuleType("PyQt5.QtWidgets"))
 
     class QObject:
         def __init__(self, parent=None) -> None:
@@ -93,6 +111,10 @@ def _install_pyqt5_stub() -> None:
         def getSaveFileName(*args, **kwargs):
             return "", ""
 
+        @staticmethod
+        def Options():
+            return None
+
     class QComboBox(_Widget):
         def currentData(self):
             return None
@@ -113,22 +135,29 @@ def _install_pyqt5_stub() -> None:
 
         return decorator
 
-    qtcore_module.QObject = QObject
-    qtcore_module.QCoreApplication = QCoreApplication
-    qtcore_module.pyqtSlot = pyqtSlot
+    if not hasattr(qtcore_module, "QObject"):
+        qtcore_module.QObject = QObject
+    if not hasattr(qtcore_module, "QCoreApplication"):
+        qtcore_module.QCoreApplication = QCoreApplication
+    qtcore_module.pyqtSlot = getattr(qtcore_module, "pyqtSlot", pyqtSlot)
 
-    qtwidgets_module.QDialog = QDialog
-    qtwidgets_module.QVBoxLayout = QVBoxLayout
-    qtwidgets_module.QHBoxLayout = QHBoxLayout
-    qtwidgets_module.QListWidget = QListWidget
-    qtwidgets_module.QAbstractItemView = QAbstractItemView
-    qtwidgets_module.QListWidgetItem = QListWidgetItem
-    qtwidgets_module.QPushButton = QPushButton
-    qtwidgets_module.QMessageBox = QMessageBox
-    qtwidgets_module.QFileDialog = QFileDialog
-    qtwidgets_module.QComboBox = QComboBox
-    qtwidgets_module.QLabel = QLabel
-    qtwidgets_module.QGroupBox = QGroupBox
+    qtwidgets_module.QDialog = getattr(qtwidgets_module, "QDialog", QDialog)
+    qtwidgets_module.QVBoxLayout = getattr(qtwidgets_module, "QVBoxLayout", QVBoxLayout)
+    qtwidgets_module.QHBoxLayout = getattr(qtwidgets_module, "QHBoxLayout", QHBoxLayout)
+    qtwidgets_module.QListWidget = getattr(qtwidgets_module, "QListWidget", QListWidget)
+    qtwidgets_module.QAbstractItemView = getattr(qtwidgets_module, "QAbstractItemView", QAbstractItemView)
+    qtwidgets_module.QListWidgetItem = getattr(qtwidgets_module, "QListWidgetItem", QListWidgetItem)
+    qtwidgets_module.QPushButton = getattr(qtwidgets_module, "QPushButton", QPushButton)
+    qtwidgets_module.QMessageBox = getattr(qtwidgets_module, "QMessageBox", QMessageBox)
+    qtwidgets_module.QFileDialog = getattr(qtwidgets_module, "QFileDialog", QFileDialog)
+    qtwidgets_module.QComboBox = getattr(qtwidgets_module, "QComboBox", QComboBox)
+    qtwidgets_module.QLabel = getattr(qtwidgets_module, "QLabel", QLabel)
+    qtwidgets_module.QGroupBox = getattr(qtwidgets_module, "QGroupBox", QGroupBox)
+
+    if not hasattr(qtwidgets_module.QFileDialog, "getSaveFileName"):
+        qtwidgets_module.QFileDialog.getSaveFileName = staticmethod(QFileDialog.getSaveFileName)
+    if not hasattr(qtwidgets_module.QFileDialog, "Options"):
+        qtwidgets_module.QFileDialog.Options = staticmethod(QFileDialog.Options)
 
     pyqt5_module.QtCore = qtcore_module
     pyqt5_module.QtWidgets = qtwidgets_module
@@ -142,6 +171,10 @@ try:
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import QFileDialog, QMessageBox
 except ModuleNotFoundError:
+    _install_pyqt5_stub()
+    from PyQt5 import QtCore
+    from PyQt5.QtWidgets import QFileDialog, QMessageBox
+else:
     _install_pyqt5_stub()
     from PyQt5 import QtCore
     from PyQt5.QtWidgets import QFileDialog, QMessageBox
@@ -186,6 +219,7 @@ def _install_settings_tab_stub() -> None:
 
 
 _install_settings_tab_stub()
+_reset_modules("app.controllers.action_handler")
 
 from app.analysis.ansys_exporter import AnsysExportUnits, AnsysExporter
 from app.controllers.action_handler import ActionHandler
@@ -315,6 +349,77 @@ class ExportUnitModeTests(unittest.TestCase):
         self.assertIn("extracted_data_for_STBD_in_display_units.csv", captured_exports)
         self.assertIn("extracted_loads_of_all_selected_parts_in_display_units.csv", captured_exports)
         self.assertFalse(any("multiplied" in export_path for export_path in captured_exports))
+
+    def test_ansys_export_keeps_detected_source_units_when_source_mode_selected(self) -> None:
+        df = pd.DataFrame(
+            {
+                "FREQ": [1000.0, 2000.0],
+                "Mount STBD T1": [1.0, 2.0],
+                "Mount STBD R1": [0.5, 1.0],
+                "Phase_Mount STBD T1": [90.0, 180.0],
+                "Phase_Mount STBD R1": [0.0, 45.0],
+            }
+        )
+        raw_unit_context = {
+            "FREQ": ColumnUnitContext.from_source_unit("FREQ", "Hz"),
+            "Mount STBD T1": ColumnUnitContext.from_source_unit("Mount STBD T1", "kN"),
+            "Mount STBD R1": ColumnUnitContext.from_source_unit("Mount STBD R1", "kN*m"),
+            "Phase_Mount STBD T1": ColumnUnitContext.from_source_unit(
+                "Phase_Mount STBD T1",
+                "deg",
+                family_hint="phase",
+            ),
+            "Phase_Mount STBD R1": ColumnUnitContext.from_source_unit(
+                "Phase_Mount STBD R1",
+                "deg",
+                family_hint="phase",
+            ),
+        }
+        handler, _ = self._build_handler(
+            df,
+            raw_unit_context,
+            data_domain="FREQ",
+            export_mode=SettingsTab.EXPORT_SOURCE_UNITS,
+            display_units={
+                "frequency": "kHz",
+                "force": "N",
+                "moment": "N*mm",
+                "phase": "rad",
+            },
+        )
+
+        captured_exports = {}
+
+        def _capture_to_csv(frame, path, *args, **kwargs):
+            captured_exports[path] = frame.copy(deep=True)
+            return None
+
+        with patch.object(ActionHandler, "_get_sides_for_export", return_value=(["STBD"], (232, r"C:\ANSYS"))), \
+                patch("app.controllers.action_handler.AnsysExporter") as exporter_cls, \
+                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv):
+            handler.handle_ansys_export()
+
+        exporter = exporter_cls.return_value
+        exporter.create_harmonic_template.assert_called_once()
+        exported_frame, exported_domain = exporter.create_harmonic_template.call_args.args[:2]
+        exported_units = exporter.create_harmonic_template.call_args.kwargs["export_units"]
+
+        self.assertEqual(exported_domain, "FREQ")
+        self.assertEqual(
+            exported_units,
+            AnsysExportUnits(
+                domain_unit="Hz",
+                force_unit="kN",
+                moment_unit="kN*m",
+                phase_unit="deg",
+            ),
+        )
+        self.assertAlmostEqual(exported_frame["FREQ"].iloc[0], 1000.0, places=6)
+        self.assertAlmostEqual(exported_frame["Mount STBD T1"].iloc[0], 1.0, places=6)
+        self.assertAlmostEqual(exported_frame["Mount STBD R1"].iloc[0], 0.5, places=6)
+        self.assertAlmostEqual(exported_frame["Phase_Mount STBD T1"].iloc[0], 90.0, places=6)
+        self.assertIn("extracted_data_for_STBD_in_source_units.csv", captured_exports)
+        self.assertIn("extracted_loads_of_all_selected_parts_in_source_units.csv", captured_exports)
 
     def test_time_domain_export_converts_displayed_plot_back_to_source_units(self) -> None:
         df = pd.DataFrame({"FREQ": [1000.0]})

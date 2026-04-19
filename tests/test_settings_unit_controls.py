@@ -10,13 +10,10 @@ import pandas as pd
 
 
 def _install_pyqt5_stub() -> None:
-    if "PyQt5" in sys.modules:
-        return
-
-    pyqt5_module = ModuleType("PyQt5")
-    qtcore_module = ModuleType("PyQt5.QtCore")
-    qtwidgets_module = ModuleType("PyQt5.QtWidgets")
-    qtgui_module = ModuleType("PyQt5.QtGui")
+    pyqt5_module = sys.modules.get("PyQt5", ModuleType("PyQt5"))
+    qtcore_module = sys.modules.get("PyQt5.QtCore", ModuleType("PyQt5.QtCore"))
+    qtwidgets_module = sys.modules.get("PyQt5.QtWidgets", ModuleType("PyQt5.QtWidgets"))
+    qtgui_module = sys.modules.get("PyQt5.QtGui", ModuleType("PyQt5.QtGui"))
 
     class _BoundSignal:
         def __init__(self) -> None:
@@ -51,6 +48,21 @@ def _install_pyqt5_stub() -> None:
     class QObject:
         def __init__(self, parent=None) -> None:
             self.parent = parent
+
+    class QCoreApplication:
+        _instance = None
+
+        def __init__(self, args=None) -> None:
+            QCoreApplication._instance = self
+
+        @classmethod
+        def instance(cls):
+            return cls._instance
+
+    class QUrl:
+        @staticmethod
+        def fromLocalFile(path):
+            return path
 
     class _QtNamespace:
         Checked = 2
@@ -334,30 +346,37 @@ def _install_pyqt5_stub() -> None:
             return function
         return decorator
 
-    qtcore_module.QObject = QObject
-    qtcore_module.Qt = _QtNamespace
+    qtcore_module.QObject = getattr(qtcore_module, "QObject", QObject)
+    qtcore_module.QCoreApplication = getattr(qtcore_module, "QCoreApplication", QCoreApplication)
+    qtcore_module.QUrl = getattr(qtcore_module, "QUrl", QUrl)
+    qtcore_module.Qt = getattr(qtcore_module, "Qt", _QtNamespace)
     qtcore_module.pyqtSignal = pyqtSignal
     qtcore_module.pyqtSlot = pyqtSlot
 
-    qtwidgets_module.QAction = QAction
-    qtwidgets_module.QApplication = QApplication
-    qtwidgets_module.QCheckBox = QCheckBox
-    qtwidgets_module.QComboBox = QComboBox
-    qtwidgets_module.QDoubleSpinBox = QDoubleSpinBox
-    qtwidgets_module.QFileDialog = QFileDialog
-    qtwidgets_module.QGroupBox = QGroupBox
-    qtwidgets_module.QHBoxLayout = QHBoxLayout
-    qtwidgets_module.QLabel = QLabel
-    qtwidgets_module.QLineEdit = QLineEdit
-    qtwidgets_module.QMainWindow = QMainWindow
-    qtwidgets_module.QMenu = QMenu
-    qtwidgets_module.QMenuBar = QMenuBar
-    qtwidgets_module.QMessageBox = QMessageBox
-    qtwidgets_module.QTabWidget = QTabWidget
-    qtwidgets_module.QVBoxLayout = QVBoxLayout
-    qtwidgets_module.QWidget = QWidget
+    qtwidgets_module.QAction = getattr(qtwidgets_module, "QAction", QAction)
+    qtwidgets_module.QApplication = getattr(qtwidgets_module, "QApplication", QApplication)
+    qtwidgets_module.QCheckBox = getattr(qtwidgets_module, "QCheckBox", QCheckBox)
+    qtwidgets_module.QComboBox = getattr(qtwidgets_module, "QComboBox", QComboBox)
+    qtwidgets_module.QDoubleSpinBox = getattr(qtwidgets_module, "QDoubleSpinBox", QDoubleSpinBox)
+    qtwidgets_module.QFileDialog = getattr(qtwidgets_module, "QFileDialog", QFileDialog)
+    qtwidgets_module.QGroupBox = getattr(qtwidgets_module, "QGroupBox", QGroupBox)
+    qtwidgets_module.QHBoxLayout = getattr(qtwidgets_module, "QHBoxLayout", QHBoxLayout)
+    qtwidgets_module.QLabel = getattr(qtwidgets_module, "QLabel", QLabel)
+    qtwidgets_module.QLineEdit = getattr(qtwidgets_module, "QLineEdit", QLineEdit)
+    qtwidgets_module.QMainWindow = getattr(qtwidgets_module, "QMainWindow", QMainWindow)
+    qtwidgets_module.QMenu = getattr(qtwidgets_module, "QMenu", QMenu)
+    qtwidgets_module.QMenuBar = getattr(qtwidgets_module, "QMenuBar", QMenuBar)
+    qtwidgets_module.QMessageBox = getattr(qtwidgets_module, "QMessageBox", QMessageBox)
+    qtwidgets_module.QTabWidget = getattr(qtwidgets_module, "QTabWidget", QTabWidget)
+    qtwidgets_module.QVBoxLayout = getattr(qtwidgets_module, "QVBoxLayout", QVBoxLayout)
+    qtwidgets_module.QWidget = getattr(qtwidgets_module, "QWidget", QWidget)
 
-    qtgui_module.QIcon = QIcon
+    qtgui_module.QIcon = getattr(qtgui_module, "QIcon", QIcon)
+
+    if not hasattr(qtwidgets_module.QFileDialog, "getSaveFileName"):
+        qtwidgets_module.QFileDialog.getSaveFileName = staticmethod(QFileDialog.getSaveFileName)
+    if not hasattr(qtwidgets_module.QFileDialog, "Options"):
+        qtwidgets_module.QFileDialog.Options = staticmethod(QFileDialog.Options)
 
     pyqt5_module.QtCore = qtcore_module
     pyqt5_module.QtWidgets = qtwidgets_module
