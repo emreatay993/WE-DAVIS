@@ -15,8 +15,9 @@ Welcome! This checklist gets you productive with WE-DAVIS in under an hour.
 
 ## 3. Run the Application
 1. From the repository root run `python main.py`.
-2. Select a directory that contains at least one raw data folder (each must hold `full.pld` and `max.pld` files).
-3. Confirm that the tabs enable correctly and sample plots render.
+2. Select a directory that contains a raw dataset whose filenames end with `full.pld` and `max.pld`.
+3. For a quick smoke test, use one of the bundled sample folders under `resources/sample_data/`.
+4. Confirm that the tabs enable correctly and sample plots render.
 
 ## 4. Explore the Codebase
 - `FILE_INDEX.md` maps every module to its purpose; keep it open while navigating the project.
@@ -26,6 +27,6 @@ Welcome! This checklist gets you productive with WE-DAVIS in under an hour.
 ## 5. Contribute Safely
 - Follow the `STATUS_REPORT.md` for current priorities and open risks.
 - When touching data ingestion or plotting, update the relevant documentation file and cross-link changes in `DOCUMENTATION_UPDATE_SUMMARY.md`.
-- Run a manual smoke test (load TIME and FREQ datasets, exercise each tab) before pushing changes; automated tests are not yet in place.
+- Run a manual smoke test (load TIME and FREQ datasets, exercise each tab) before pushing changes; bundled samples now live under `resources/sample_data/`, and automated tests are not yet in place.
 
-You are ready to build! Reach out to the maintainer listed in the Settings tab for access to sample datasets or infrastructure credentials.
+You are ready to build! Reach out to the maintainer listed in the Settings tab for additional field datasets or infrastructure credentials.

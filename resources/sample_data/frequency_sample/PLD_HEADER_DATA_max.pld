@@ -1,0 +1,10 @@
+|                         Interface Label                         |  UNIT  |MAGNITUDE |PHASE(deg)| FREQ(Hz) |
+_____________________________________________________________________________________________________________
+|                I1 - STBD REAR MOUNT (CS-8012) T1                |   kN   |  3.2520  |  11.91   |  747.50  |
+|                I2 - PORT REAR MOUNT (CS-8013) T1                |   kN   |  1.5814  |  156.76  |  749.50  |
+|              I3-TT/FBS/IPS - TT Side (CS-8001) T1               |   kN   |  1.2553  |  -105.63 |  742.50  |
+|              I3-TT/FBS/IPS - TT Side (CS-8001) T2               |   kN   |  1.5807  |  29.18   |  746.00  |
+|              I3-TT/FBS/IPS - TT Side (CS-8001) T3               |   kN   |  1.2147  |  -150.27 |  749.50  |
+|             I3-TT/FBS/IPS - TT Side (CS-8001) T2/T3             |   kN   |  1.9645  |   -37.02 |  748.00  |
+|              I3-TT/FBS/IPS - TT Side (CS-8001) R1               |  kN*m  |  0.0152  |   -65.18 |  749.50  |
+|              I3-TT/FBS/IPS - TT Side (CS-8001) R2               |  kN*m  |  0.7317  |   60.49  |  746.50  |

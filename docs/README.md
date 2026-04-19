@@ -22,13 +22,13 @@ Quickstart
    pip install -r requirements.txt
 4. Run the app:
    python main.py
-5. On first launch, select a folder that contains both full.pld and max.pld.
+5. On first launch, select a dataset folder whose filenames end with full.pld and max.pld. Bundled samples are available under resources/sample_data/.
 
 Data Requirements
 
 - Each selected folder must include:
-  - full.pld: numeric data (TIME or FREQ column present).
-  - max.pld: header file used to derive interface/channel names.
+  - a file ending with full.pld: numeric data (TIME or FREQ column present).
+  - a file ending with max.pld: header file used to derive interface/channel names.
 
 High-Level Workflow
 

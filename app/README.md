@@ -12,11 +12,12 @@ WE-DAVIS is a PyQt5 desktop application for inspecting mechanical load datasets 
 ## Quick Start
 1. Install dependencies: `pip install -r requirements.txt` (see `app/requirements.txt`).
 2. Launch the app from the repo root: `python main.py`.
-3. When prompted, pick the directory that contains one or more raw data folders. Each folder must include matching `full.pld` (data) and `max.pld` (header) files.
+3. When prompted, pick a raw data folder whose filenames end with `full.pld` (data) and `max.pld` (header). Bundled sample folders live under `resources/sample_data/`.
 4. Use the left dock to add more folders at any time. Tabs will enable or disable automatically based on how many folders and which domain type were detected.
 
 ## Data Expectations
 - Each selected folder should contain harmonized `.pld` exports with either a `FREQ` or `TIME` column.
+- The loader matches files by suffix, so names such as `PLD_DATA_0_full.pld` and `PLD_HEADER_DATA_max.pld` are valid inputs.
 - `max.pld` files supply channel labels. Frequency-domain loads also expect matching `Phase_` columns; these are constructed automatically.
 - Mixed domain folders are rejected for safety; reload data if you need to switch between TIME and FREQ datasets.
 - The app decorates every row with a `DataFolder` column to preserve provenance across merged runs.

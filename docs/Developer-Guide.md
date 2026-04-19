@@ -17,7 +17,8 @@ Setup
    python main.py
 
 3. First-run data selection
-   - A dialog will ask for a folder containing full.pld and max.pld
+   - A dialog will ask for a dataset folder containing files whose names end with full.pld and max.pld
+   - Bundled samples are available under resources/sample_data/
 
 Coding Conventions
 
@@ -50,6 +51,7 @@ Testing Notes
 
 - Use scripts/test_dt.py to verify robust Δt computation on TIME datasets
 - Manual smoke tests:
+  - Load one of the bundled sample folders under resources/sample_data/
   - Load single TIME folder → verify computed selections, spectrum, envelope
   - Load single FREQ folder → verify phase plot and Time Domain Represent
   - Load additional folders from dock → verify multi-folder selectors and legends
