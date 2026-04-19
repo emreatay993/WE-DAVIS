@@ -5,10 +5,21 @@ import re
 import shutil
 import traceback
 from collections import OrderedDict
+from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 import math
 from PyQt5.QtWidgets import QMessageBox
+
+from ..units import convert_scalar, convert_series
+
+
+@dataclass(frozen=True)
+class AnsysExportUnits:
+    domain_unit: str
+    force_unit: str = "kN"
+    moment_unit: str = "kN*m"
+    phase_unit: str = "deg"
 
 
 class AnsysExporter:
@@ -141,10 +152,64 @@ class AnsysExporter:
             except Exception as e:
                 print(f"Error closing Ansys session: {e}")
 
-    def create_harmonic_template(self, df_export, data_domain):
+    @staticmethod
+    def _coerce_export_units(export_units, default_domain_unit):
+        if export_units is None:
+            return AnsysExportUnits(domain_unit=default_domain_unit)
+        if isinstance(export_units, AnsysExportUnits):
+            return export_units
+        return AnsysExportUnits(
+            domain_unit=export_units.get("domain_unit", default_domain_unit),
+            force_unit=export_units.get("force_unit", "kN"),
+            moment_unit=export_units.get("moment_unit", "kN*m"),
+            phase_unit=export_units.get("phase_unit", "deg"),
+        )
+
+    @staticmethod
+    def _to_quantity_unit(unit_name):
+        return unit_name.replace("*", " ")
+
+    @staticmethod
+    def _convert_scalar_to_unit(value, source_unit, target_unit, family_hint):
+        if source_unit == target_unit:
+            return value
+        return convert_scalar(
+            value,
+            source_unit=source_unit,
+            target_unit=target_unit,
+            family_hint=family_hint,
+        )
+
+    @staticmethod
+    def _convert_dataframe_to_unit(frame, source_unit, target_unit, family_hint):
+        converted = frame.copy(deep=True)
+        if source_unit == target_unit:
+            return converted
+        for column_name in converted.columns:
+            converted.loc[:, column_name] = convert_series(
+                converted.loc[:, column_name],
+                source_unit=source_unit,
+                target_unit=target_unit,
+                family_hint=family_hint,
+            )
+        return converted
+
+    @staticmethod
+    def _convert_phase_series_to_radians(series, phase_unit):
+        if phase_unit == "rad":
+            return series.copy(deep=True)
+        return convert_series(
+            series,
+            source_unit=phase_unit,
+            target_unit="rad",
+            family_hint="phase",
+        )
+
+    def create_harmonic_template(self, df_export, data_domain, export_units=None):
         if not self._init_ansys_session():
             return
         try:
+            export_units = self._coerce_export_units(export_units, default_domain_unit="Hz")
             all_keys = ["T1", "T2", "T3", "R1", "R2", "R3", "Phase_T1", "Phase_T2", "Phase_T3", "Phase_R1", "Phase_R2",
                         "Phase_R3"]
 
@@ -174,9 +239,20 @@ class AnsysExporter:
                                     full_interfaces.items()}
             list_of_part_interface_names = list(interface_dicts_full.keys())
 
-            scale_factor = 1000
             list_of_all_frequencies = df_export["FREQ"].tolist()
-            list_of_all_frequencies_as_quantity = [self.Quantity(val, "Hz") for val in list_of_all_frequencies]
+            frequency_quantity_unit = self._to_quantity_unit(export_units.domain_unit)
+            force_quantity_unit = self._to_quantity_unit(export_units.force_unit)
+            moment_quantity_unit = self._to_quantity_unit(export_units.moment_unit)
+            phase_quantity_unit = self._to_quantity_unit(export_units.phase_unit)
+            list_of_all_frequencies_as_quantity = [
+                self.Quantity(val, frequency_quantity_unit) for val in list_of_all_frequencies
+            ]
+            max_frequency_hz = self._convert_scalar_to_unit(
+                df_export["FREQ"].max(),
+                source_unit=export_units.domain_unit,
+                target_unit="Hz",
+                family_hint="frequency",
+            )
 
             self.Model.AddGeometryImportGroup().AddGeometryImport()
 
@@ -189,13 +265,13 @@ class AnsysExporter:
             self.DataModel.GetObjectsByName("Pre-Stress (None)")[0].PreStressICEnvironment = analysis_static
             analysis_settings_modal.PropertyByName("NumModesToFind").InternalValue = 100
             analysis_settings_modal.PropertyByName("RangeSearch").InternalValue = 1
-            analysis_settings_modal.PropertyByName("MaxFrequency").InternalValue = df_export['FREQ'].max() * 1.5
+            analysis_settings_modal.PropertyByName("MaxFrequency").InternalValue = max_frequency_hz * 1.5
             analysis_settings_modal.PropertyByName("MSUPSkipExpansion").InternalValue = 1
             analysis_settings_modal.PropertyByName("SolverUnitsControl").InternalValue = 1
 
             analysis_HR = self.Model.AddHarmonicResponseAnalysis()
             analysis_settings_HR = analysis_HR.AnalysisSettings
-            analysis_settings_HR.PropertyByName("HarmonicForcingFrequencyMax").InternalValue = df_export['FREQ'].max()
+            analysis_settings_HR.PropertyByName("HarmonicForcingFrequencyMax").InternalValue = max_frequency_hz
             self.DataModel.GetObjectsByName("Pre-Stress/Modal (None)")[0].PreStressICEnvironment = analysis_modal
             analysis_settings_HR.PropertyByName("MSUPSkipExpansion").InternalValue = 1
             analysis_settings_HR.PropertyByName("CombineDistResultFile").InternalValue = 1
@@ -230,14 +306,14 @@ class AnsysExporter:
                 moment_HR.Suppressed = True
                 moment_HR_index_name = "RM_" + str(interface_index_no)
 
-                list_of_fx_values = [self.Quantity(v, "kN") for v in interface_dicts_full[interface_name]["T1"]]
-                list_of_fy_values = [self.Quantity(v, "kN") for v in interface_dicts_full[interface_name]["T2"]]
-                list_of_fz_values = [self.Quantity(v, "kN") for v in interface_dicts_full[interface_name]["T3"]]
-                list_of_angle_fx_values = [self.Quantity(v, "deg") for v in
+                list_of_fx_values = [self.Quantity(v, force_quantity_unit) for v in interface_dicts_full[interface_name]["T1"]]
+                list_of_fy_values = [self.Quantity(v, force_quantity_unit) for v in interface_dicts_full[interface_name]["T2"]]
+                list_of_fz_values = [self.Quantity(v, force_quantity_unit) for v in interface_dicts_full[interface_name]["T3"]]
+                list_of_angle_fx_values = [self.Quantity(v, phase_quantity_unit) for v in
                                            interface_dicts_full[interface_name]["Phase_T1"]]
-                list_of_angle_fy_values = [self.Quantity(v, "deg") for v in
+                list_of_angle_fy_values = [self.Quantity(v, phase_quantity_unit) for v in
                                            interface_dicts_full[interface_name]["Phase_T2"]]
-                list_of_angle_fz_values = [self.Quantity(v, "deg") for v in
+                list_of_angle_fz_values = [self.Quantity(v, phase_quantity_unit) for v in
                                            interface_dicts_full[interface_name]["Phase_T3"]]
 
                 df_load_table_fx = pd.DataFrame(
@@ -273,14 +349,14 @@ class AnsysExporter:
                 df_load_table_fz_imag = pd.DataFrame(
                     df_load_table_fz['T3'] * np.sin(df_load_table_phase_fz['Phase_T3']), columns=['Imag_T3'])
 
-                list_of_mx_values = [self.Quantity(v, "kN m") for v in interface_dicts_full[interface_name]["R1"]]
-                list_of_my_values = [self.Quantity(v, "kN m") for v in interface_dicts_full[interface_name]["R2"]]
-                list_of_mz_values = [self.Quantity(v, "kN m") for v in interface_dicts_full[interface_name]["R3"]]
-                list_of_angle_mx_values = [self.Quantity(v, "deg") for v in
+                list_of_mx_values = [self.Quantity(v, moment_quantity_unit) for v in interface_dicts_full[interface_name]["R1"]]
+                list_of_my_values = [self.Quantity(v, moment_quantity_unit) for v in interface_dicts_full[interface_name]["R2"]]
+                list_of_mz_values = [self.Quantity(v, moment_quantity_unit) for v in interface_dicts_full[interface_name]["R3"]]
+                list_of_angle_mx_values = [self.Quantity(v, phase_quantity_unit) for v in
                                            interface_dicts_full[interface_name]["Phase_R1"]]
-                list_of_angle_my_values = [self.Quantity(v, "deg") for v in
+                list_of_angle_my_values = [self.Quantity(v, phase_quantity_unit) for v in
                                            interface_dicts_full[interface_name]["Phase_R2"]]
-                list_of_angle_mz_values = [self.Quantity(v, "deg") for v in
+                list_of_angle_mz_values = [self.Quantity(v, phase_quantity_unit) for v in
                                            interface_dicts_full[interface_name]["Phase_R3"]]
 
                 df_load_table_mx = pd.DataFrame(
@@ -289,10 +365,14 @@ class AnsysExporter:
                 df_load_table_phase_mx = pd.DataFrame({'FREQ': list_of_all_frequencies,
                                                        'Phase_R1': interface_dicts_full[interface_name][
                                                            "Phase_R1"]}).set_index('FREQ')
+                phase_mx_radians = self._convert_phase_series_to_radians(
+                    df_load_table_phase_mx['Phase_R1'],
+                    export_units.phase_unit,
+                )
                 df_load_table_mx_real = pd.DataFrame(
-                    df_load_table_mx['R1'] * np.cos(df_load_table_phase_mx['Phase_R1']), columns=['Real_R1'])
+                    df_load_table_mx['R1'] * np.cos(phase_mx_radians), columns=['Real_R1'])
                 df_load_table_mx_imag = pd.DataFrame(
-                    df_load_table_mx['R1'] * np.sin(df_load_table_phase_mx['Phase_R1']), columns=['Imag_R1'])
+                    df_load_table_mx['R1'] * np.sin(phase_mx_radians), columns=['Imag_R1'])
 
                 df_load_table_my = pd.DataFrame(
                     {'FREQ': list_of_all_frequencies, 'R2': interface_dicts_full[interface_name]["R2"]}).set_index(
@@ -300,10 +380,14 @@ class AnsysExporter:
                 df_load_table_phase_my = pd.DataFrame({'FREQ': list_of_all_frequencies,
                                                        'Phase_R2': interface_dicts_full[interface_name][
                                                            "Phase_R2"]}).set_index('FREQ')
+                phase_my_radians = self._convert_phase_series_to_radians(
+                    df_load_table_phase_my['Phase_R2'],
+                    export_units.phase_unit,
+                )
                 df_load_table_my_real = pd.DataFrame(
-                    df_load_table_my['R2'] * np.cos(df_load_table_phase_my['Phase_R2']), columns=['Real_R2'])
+                    df_load_table_my['R2'] * np.cos(phase_my_radians), columns=['Real_R2'])
                 df_load_table_my_imag = pd.DataFrame(
-                    df_load_table_my['R2'] * np.sin(df_load_table_phase_my['Phase_R2']), columns=['Imag_R2'])
+                    df_load_table_my['R2'] * np.sin(phase_my_radians), columns=['Imag_R2'])
 
                 df_load_table_mz = pd.DataFrame(
                     {'FREQ': list_of_all_frequencies, 'R3': interface_dicts_full[interface_name]["R3"]}).set_index(
@@ -311,10 +395,14 @@ class AnsysExporter:
                 df_load_table_phase_mz = pd.DataFrame({'FREQ': list_of_all_frequencies,
                                                        'Phase_R3': interface_dicts_full[interface_name][
                                                            "Phase_R3"]}).set_index('FREQ')
+                phase_mz_radians = self._convert_phase_series_to_radians(
+                    df_load_table_phase_mz['Phase_R3'],
+                    export_units.phase_unit,
+                )
                 df_load_table_mz_real = pd.DataFrame(
-                    df_load_table_mz['R3'] * np.cos(df_load_table_phase_mz['Phase_R3']), columns=['Real_R3'])
+                    df_load_table_mz['R3'] * np.cos(phase_mz_radians), columns=['Real_R3'])
                 df_load_table_mz_imag = pd.DataFrame(
-                    df_load_table_mz['R3'] * np.sin(df_load_table_phase_mz['Phase_R3']), columns=['Imag_R3'])
+                    df_load_table_mz['R3'] * np.sin(phase_mz_radians), columns=['Imag_R3'])
 
                 force_HR.XComponent.Inputs[0].DiscreteValues = list_of_all_frequencies_as_quantity
                 force_HR.YComponent.Inputs[0].DiscreteValues = list_of_all_frequencies_as_quantity
@@ -345,17 +433,54 @@ class AnsysExporter:
                 command_snippet_RM = analysis_HR.AddCommandSnippet()
                 command_snippet_RM.Name = "Commands_RM_" + interface_name
 
-                apdl_lines_RMx = self._create_APDL_table(df_load_table_mx_real * scale_factor,
+                moment_real_x = self._convert_dataframe_to_unit(
+                    df_load_table_mx_real,
+                    source_unit=export_units.moment_unit,
+                    target_unit="N*m",
+                    family_hint="moment",
+                )
+                moment_real_y = self._convert_dataframe_to_unit(
+                    df_load_table_my_real,
+                    source_unit=export_units.moment_unit,
+                    target_unit="N*m",
+                    family_hint="moment",
+                )
+                moment_real_z = self._convert_dataframe_to_unit(
+                    df_load_table_mz_real,
+                    source_unit=export_units.moment_unit,
+                    target_unit="N*m",
+                    family_hint="moment",
+                )
+                moment_imag_x = self._convert_dataframe_to_unit(
+                    df_load_table_mx_imag,
+                    source_unit=export_units.moment_unit,
+                    target_unit="N*m",
+                    family_hint="moment",
+                )
+                moment_imag_y = self._convert_dataframe_to_unit(
+                    df_load_table_my_imag,
+                    source_unit=export_units.moment_unit,
+                    target_unit="N*m",
+                    family_hint="moment",
+                )
+                moment_imag_z = self._convert_dataframe_to_unit(
+                    df_load_table_mz_imag,
+                    source_unit=export_units.moment_unit,
+                    target_unit="N*m",
+                    family_hint="moment",
+                )
+
+                apdl_lines_RMx = self._create_APDL_table(moment_real_x,
                                                          "table_X_" + moment_HR_index_name, data_domain)
-                apdl_lines_RMy = self._create_APDL_table(df_load_table_my_real * scale_factor,
+                apdl_lines_RMy = self._create_APDL_table(moment_real_y,
                                                          "table_Y_" + moment_HR_index_name, data_domain)
-                apdl_lines_RMz = self._create_APDL_table(df_load_table_mz_real * scale_factor,
+                apdl_lines_RMz = self._create_APDL_table(moment_real_z,
                                                          "table_Z_" + moment_HR_index_name, data_domain)
-                apdl_lines_RMxi = self._create_APDL_table(df_load_table_mx_imag * scale_factor,
+                apdl_lines_RMxi = self._create_APDL_table(moment_imag_x,
                                                           "table_Xi_" + moment_HR_index_name, data_domain)
-                apdl_lines_RMyi = self._create_APDL_table(df_load_table_my_imag * scale_factor,
+                apdl_lines_RMyi = self._create_APDL_table(moment_imag_y,
                                                           "table_Yi_" + moment_HR_index_name, data_domain)
-                apdl_lines_RMzi = self._create_APDL_table(df_load_table_mz_imag * scale_factor,
+                apdl_lines_RMzi = self._create_APDL_table(moment_imag_z,
                                                           "table_Zi_" + moment_HR_index_name, data_domain)
 
                 command_snippet_RM.AppendText(''.join(apdl_lines_RMx))
@@ -425,10 +550,11 @@ class AnsysExporter:
         finally:
             self._close_ansys_session()
 
-    def create_transient_template(self, df_export, data_domain, sample_rate):
+    def create_transient_template(self, df_export, data_domain, export_units=None):
         if not self._init_ansys_session():
             return
         try:
+            export_units = self._coerce_export_units(export_units, default_domain_unit="s")
             all_keys = ["T1", "T2", "T3", "R1", "R2", "R3"]
 
             def get_full_interface_name(column_name):
@@ -453,8 +579,27 @@ class AnsysExporter:
                                     full_interfaces.items()}
             list_of_part_interface_names = list(interface_dicts_full.keys())
 
-            scale_factor = 1000
             list_of_all_time_points = df_export["TIME"].tolist()
+            time_quantity_unit = self._to_quantity_unit(export_units.domain_unit)
+            force_quantity_unit = self._to_quantity_unit(export_units.force_unit)
+            moment_quantity_unit = self._to_quantity_unit(export_units.moment_unit)
+            end_time_seconds = self._convert_scalar_to_unit(
+                max(list_of_all_time_points),
+                source_unit=export_units.domain_unit,
+                target_unit="s",
+                family_hint="time",
+            )
+            if len(list_of_all_time_points) > 1:
+                average_dt = pd.Series(list_of_all_time_points).diff().dropna().mean()
+                average_dt_seconds = self._convert_scalar_to_unit(
+                    average_dt,
+                    source_unit=export_units.domain_unit,
+                    target_unit="s",
+                    family_hint="time",
+                )
+                sample_rate_hz = 0 if average_dt_seconds == 0 else 1 / average_dt_seconds
+            else:
+                sample_rate_hz = 0
 
             self.Model.AddGeometryImportGroup().AddGeometryImport()
 
@@ -467,7 +612,7 @@ class AnsysExporter:
             self.DataModel.GetObjectsByName("Pre-Stress (None)")[0].PreStressICEnvironment = analysis_static
             analysis_settings_modal.PropertyByName("NumModesToFind").InternalValue = 100
             analysis_settings_modal.PropertyByName("RangeSearch").InternalValue = 1
-            analysis_settings_modal.PropertyByName("MaxFrequency").InternalValue = sample_rate
+            analysis_settings_modal.PropertyByName("MaxFrequency").InternalValue = sample_rate_hz
             analysis_settings_modal.PropertyByName("SolverUnitsControl").InternalValue = 1
 
             analysis_TR = self.Model.AddTransientStructuralAnalysis()
@@ -475,7 +620,7 @@ class AnsysExporter:
             self.DataModel.GetObjectsByName("Modal (None)")[0].ModalICEnvironment = analysis_modal
             analysis_settings_TR.PropertyByName("TimeStepDefineby").InternalValue = 0
             analysis_settings_TR.PropertyByName("NumberOfSubSteps").InternalValue = len(list_of_all_time_points)
-            analysis_settings_TR.PropertyByName("EndTime").InternalValue = max(list_of_all_time_points)
+            analysis_settings_TR.PropertyByName("EndTime").InternalValue = end_time_seconds
             analysis_settings_TR.PropertyByName("MSUPSkipExpansion").InternalValue = 1
             analysis_settings_TR.PropertyByName("CombineDistResultFile").InternalValue = 1
             analysis_settings_TR.PropertyByName("ExpandResultFrom").InternalValue = 1
@@ -562,30 +707,30 @@ def after_post(this, solution):
                     moment_TR.Location = RP_interface
                     moment_TR_list_of_all_partitions.append(moment_TR)
 
-                    force_TR.XComponent.Inputs[0].DiscreteValues = [self.Quantity(v, "s") for v in
+                    force_TR.XComponent.Inputs[0].DiscreteValues = [self.Quantity(v, time_quantity_unit) for v in
                                                                     partitioned_df_load_table_fx[i]['TIME']]
-                    force_TR.YComponent.Inputs[0].DiscreteValues = [self.Quantity(v, "s") for v in
+                    force_TR.YComponent.Inputs[0].DiscreteValues = [self.Quantity(v, time_quantity_unit) for v in
                                                                     partitioned_df_load_table_fy[i]['TIME']]
-                    force_TR.ZComponent.Inputs[0].DiscreteValues = [self.Quantity(v, "s") for v in
+                    force_TR.ZComponent.Inputs[0].DiscreteValues = [self.Quantity(v, time_quantity_unit) for v in
                                                                     partitioned_df_load_table_fz[i]['TIME']]
-                    force_TR.XComponent.Output.DiscreteValues = [self.Quantity(v, "kN") for v in
+                    force_TR.XComponent.Output.DiscreteValues = [self.Quantity(v, force_quantity_unit) for v in
                                                                  partitioned_df_load_table_fx[i]['T1']]
-                    force_TR.YComponent.Output.DiscreteValues = [self.Quantity(v, "kN") for v in
+                    force_TR.YComponent.Output.DiscreteValues = [self.Quantity(v, force_quantity_unit) for v in
                                                                  partitioned_df_load_table_fy[i]['T2']]
-                    force_TR.ZComponent.Output.DiscreteValues = [self.Quantity(v, "kN") for v in
+                    force_TR.ZComponent.Output.DiscreteValues = [self.Quantity(v, force_quantity_unit) for v in
                                                                  partitioned_df_load_table_fz[i]['T3']]
 
-                    moment_TR.XComponent.Inputs[0].DiscreteValues = [self.Quantity(v, "s") for v in
+                    moment_TR.XComponent.Inputs[0].DiscreteValues = [self.Quantity(v, time_quantity_unit) for v in
                                                                      partitioned_df_load_table_mx[i]['TIME']]
-                    moment_TR.YComponent.Inputs[0].DiscreteValues = [self.Quantity(v, "s") for v in
+                    moment_TR.YComponent.Inputs[0].DiscreteValues = [self.Quantity(v, time_quantity_unit) for v in
                                                                      partitioned_df_load_table_my[i]['TIME']]
-                    moment_TR.ZComponent.Inputs[0].DiscreteValues = [self.Quantity(v, "s") for v in
+                    moment_TR.ZComponent.Inputs[0].DiscreteValues = [self.Quantity(v, time_quantity_unit) for v in
                                                                      partitioned_df_load_table_mz[i]['TIME']]
-                    moment_TR.XComponent.Output.DiscreteValues = [self.Quantity(v, "kN m") for v in
+                    moment_TR.XComponent.Output.DiscreteValues = [self.Quantity(v, moment_quantity_unit) for v in
                                                                   partitioned_df_load_table_mx[i]['R1']]
-                    moment_TR.YComponent.Output.DiscreteValues = [self.Quantity(v, "kN m") for v in
+                    moment_TR.YComponent.Output.DiscreteValues = [self.Quantity(v, moment_quantity_unit) for v in
                                                                   partitioned_df_load_table_my[i]['R2']]
-                    moment_TR.ZComponent.Output.DiscreteValues = [self.Quantity(v, "kN m") for v in
+                    moment_TR.ZComponent.Output.DiscreteValues = [self.Quantity(v, moment_quantity_unit) for v in
                                                                   partitioned_df_load_table_mz[i]['R3']]
 
                 def are_all_zeroes(*lists):

@@ -11,8 +11,10 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QListWidget, QAbstractItemVie
                              QFileDialog, QComboBox, QLabel, QGroupBox)
 from scipy.signal.windows import tukey
 
-from ..analysis.ansys_exporter import AnsysExporter
+from ..analysis.ansys_exporter import AnsysExportUnits, AnsysExporter
 from ..analysis.data_processing import apply_data_section, apply_tukey_window
+from ..ui.tab_settings import SettingsTab
+from ..units import ColumnUnitContext, ConversionSpec, convert_dataframe_copy, convert_series
 
 
 class ActionHandler(QtCore.QObject):
@@ -23,6 +25,176 @@ class ActionHandler(QtCore.QObject):
         super().__init__(parent)
         self.main_window = main_window
         self.data_manager = data_manager
+
+    def _get_source_df(self):
+        raw_df = getattr(self.main_window, "raw_primary_df", None)
+        return raw_df if raw_df is not None else self.main_window.df
+
+    def _get_export_mode(self):
+        export_mode = getattr(self.main_window, "export_unit_mode", SettingsTab.EXPORT_SOURCE_UNITS)
+        if export_mode in {SettingsTab.EXPORT_SOURCE_UNITS, SettingsTab.EXPORT_DISPLAY_UNITS}:
+            return export_mode
+        return SettingsTab.EXPORT_SOURCE_UNITS
+
+    def _get_export_mode_slug(self):
+        if self._get_export_mode() == SettingsTab.EXPORT_DISPLAY_UNITS:
+            return "display_units"
+        return "source_units"
+
+    def _get_export_mode_label(self):
+        return self._get_export_mode()
+
+    def _get_export_context_map(self):
+        if self._get_export_mode() == SettingsTab.EXPORT_DISPLAY_UNITS:
+            context_map = getattr(self.main_window, "unit_context", None)
+        else:
+            context_map = getattr(self.main_window, "raw_unit_context", None)
+            if context_map is None:
+                context_map = getattr(self.main_window, "unit_context", None)
+        return context_map if context_map is not None else {}
+
+    def _get_display_context_map(self):
+        context_map = getattr(self.main_window, "unit_context", None)
+        return context_map if context_map is not None else {}
+
+    def _build_export_frame(self, frame):
+        export_frame = frame.copy(deep=True)
+        export_context_map = self._get_export_context_map()
+        if self._get_export_mode() != SettingsTab.EXPORT_DISPLAY_UNITS:
+            return export_frame, export_context_map
+
+        conversions = {}
+        for column_name in export_frame.columns:
+            context = export_context_map.get(column_name)
+            if (
+                context is None
+                or context.native_only
+                or context.normalized_unit is None
+                or context.display_unit is None
+                or context.normalized_unit == context.display_unit
+            ):
+                continue
+            conversions[column_name] = ConversionSpec(
+                source_unit=context.normalized_unit,
+                target_unit=context.display_unit,
+                family_hint=context.quantity_family,
+            )
+
+        if conversions:
+            export_frame = convert_dataframe_copy(export_frame, conversions)
+        return export_frame, export_context_map
+
+    def _build_theta_display_context(self):
+        active_display_units = getattr(self.main_window, "active_display_units_by_family", None) or {}
+        theta_display_unit = active_display_units.get("phase", "deg")
+        return ColumnUnitContext.from_source_unit(
+            "Theta",
+            "deg",
+            display_unit=theta_display_unit,
+            family_hint="phase",
+        )
+
+    def _convert_display_series_to_export_mode(self, values, context):
+        series = pd.Series(values, copy=True)
+        if (
+            self._get_export_mode() == SettingsTab.EXPORT_DISPLAY_UNITS
+            or context is None
+            or context.native_only
+            or context.normalized_unit is None
+            or context.display_unit is None
+            or context.normalized_unit == context.display_unit
+        ):
+            return series
+        return convert_series(
+            series,
+            source_unit=context.display_unit,
+            target_unit=context.normalized_unit,
+            family_hint=context.quantity_family,
+        )
+
+    def _validate_ansys_export_units(self, export_frame, export_context_map):
+        if export_frame is None or export_frame.empty:
+            return None, "ANSYS export requires at least one selected data column."
+
+        data_domain = self.main_window.data_domain
+        expected_domain_family = "frequency" if data_domain == "FREQ" else "time" if data_domain == "TIME" else None
+        if expected_domain_family is None:
+            return None, f"ANSYS export does not support the '{data_domain}' data domain."
+
+        family_units = {
+            expected_domain_family: set(),
+            "force": set(),
+            "moment": set(),
+            "phase": set(),
+        }
+        validation_errors = []
+
+        for column_name in export_frame.columns:
+            if column_name in {"NO", "DataFolder"}:
+                continue
+
+            if column_name == data_domain:
+                expected_family = expected_domain_family
+            elif column_name.startswith("Phase_"):
+                expected_family = "phase"
+            else:
+                component_match = re.search(r"\b([TR])[1-3]$", column_name)
+                if component_match is None:
+                    validation_errors.append(
+                        f"- Column '{column_name}' is not a supported ANSYS load channel."
+                    )
+                    continue
+                expected_family = "force" if component_match.group(1) == "T" else "moment"
+
+            context = export_context_map.get(column_name)
+            export_unit = None if context is None else (context.display_unit or context.normalized_unit)
+            resolved_family = "unknown" if context is None else context.quantity_family
+            if (
+                context is None
+                or export_unit is None
+                or context.native_only
+                or resolved_family == "unknown"
+            ):
+                validation_errors.append(
+                    f"- Column '{column_name}' does not have a known export unit for ANSYS."
+                )
+                continue
+            if resolved_family != expected_family:
+                validation_errors.append(
+                    f"- Column '{column_name}' resolves to '{resolved_family}' [{export_unit}] but ANSYS export "
+                    f"expects '{expected_family}'."
+                )
+                continue
+            family_units[expected_family].add(export_unit)
+
+        mixed_unit_errors = [
+            f"- {family.title()} columns resolve to multiple export units: {', '.join(sorted(units))}."
+            for family, units in family_units.items()
+            if len(units) > 1
+        ]
+        validation_errors.extend(mixed_unit_errors)
+
+        if validation_errors:
+            error_message = (
+                "ANSYS export only supports known load-compatible quantity families for the selected export mode.\n\n"
+                f"Export mode: {self._get_export_mode_label()}\n"
+                "Required mapping:\n"
+                f"- {data_domain}: {expected_domain_family}\n"
+                "- T1/T2/T3: force\n"
+                "- R1/R2/R3: moment\n"
+                "- Phase_*: phase\n\n"
+                "Validation details:\n"
+                + "\n".join(validation_errors)
+            )
+            return None, error_message
+
+        default_domain_unit = "Hz" if expected_domain_family == "frequency" else "s"
+        return AnsysExportUnits(
+            domain_unit=next(iter(family_units[expected_domain_family]), default_domain_unit),
+            force_unit=next(iter(family_units["force"]), "N"),
+            moment_unit=next(iter(family_units["moment"]), "N*m"),
+            phase_unit=next(iter(family_units["phase"]), "deg"),
+        ), None
 
     def _get_ansys_base_paths(self):
         """Returns list of possible ANSYS installation base paths to search."""
@@ -160,24 +332,36 @@ class ActionHandler(QtCore.QObject):
                 return
 
             num_points = 360 // interval
-            theta_points = [i * interval for i in range(num_points + 1)]
-            data_dict = {'Theta': theta_points}
+            sample_indices = [i * interval for i in range(num_points + 1)]
+            first_plot_data = next(iter(tab.current_plot_data.values()))
+            theta_values = pd.Series(first_plot_data["theta"], copy=True).iloc[sample_indices].reset_index(drop=True)
+            theta_context = self._build_theta_display_context()
+            exported_theta = self._convert_display_series_to_export_mode(theta_values, theta_context)
+            data_dict = {'Theta': exported_theta.tolist()}
+            display_context_map = self._get_display_context_map()
 
             for col, plot_data in tab.current_plot_data.items():
-                full_theta = plot_data['theta']
-                full_y_data = plot_data['y_data']
-                sampled_y_data = [full_y_data[theta] for theta in theta_points]
-                data_dict[col] = sampled_y_data
+                full_y_data = pd.Series(plot_data['y_data'], copy=True).iloc[sample_indices].reset_index(drop=True)
+                column_context = display_context_map.get(col)
+                exported_y_data = self._convert_display_series_to_export_mode(full_y_data, column_context)
+                data_dict[col] = exported_y_data.tolist()
 
             df_to_export = pd.DataFrame(data_dict)
 
             save_path, _ = QFileDialog.getSaveFileName(
-                self.main_window, "Save Extracted Data", "extracted_time_represent_data.csv", "CSV Files (*.csv)"
+                self.main_window,
+                "Save Extracted Data",
+                f"extracted_time_represent_data_{self._get_export_mode_slug()}.csv",
+                "CSV Files (*.csv)",
             )
 
             if save_path:
                 df_to_export.to_csv(save_path, index=False)
-                QMessageBox.information(self.main_window, "Export Successful", f"Data successfully saved to:\n{save_path}")
+                QMessageBox.information(
+                    self.main_window,
+                    "Export Successful",
+                    f"Data successfully saved in {self._get_export_mode_label()} mode to:\n{save_path}",
+                )
                 os.startfile(os.path.dirname(save_path))
 
         except (ValueError, KeyError) as e:
@@ -186,7 +370,7 @@ class ActionHandler(QtCore.QObject):
     @QtCore.pyqtSlot()
     def handle_ansys_export(self):
         """Controller slot to manage the Ansys export process."""
-        df = self.main_window.df
+        df = self._get_source_df()
         data_domain = self.main_window.data_domain
         if df is None:
             QMessageBox.warning(self.main_window, "No Data", "Please load data before exporting.")
@@ -229,34 +413,39 @@ class ActionHandler(QtCore.QObject):
                 else:
                     print("Warning: Cannot apply Tukey window to a dataset with one or zero points.")
 
-        df_combined_converted = pd.DataFrame()
+        df_export_processed, export_context_map = self._build_export_frame(df_processed)
+        export_units, validation_error = self._validate_ansys_export_units(df_export_processed, export_context_map)
+        if validation_error:
+            QMessageBox.warning(self.main_window, "Unsupported ANSYS Export", validation_error)
+            return
+
+        df_combined_export = pd.DataFrame()
+        export_mode_slug = self._get_export_mode_slug()
         for side in selected_sides:
             side_pattern = re.compile(rf'\b{re.escape(side)}\b')
             side_cols_to_keep = [data_domain]
-            side_cols_to_keep.extend([c for c in df_processed.columns if side_pattern.search(c)])
-            df_part_processed = df_processed[list(OrderedDict.fromkeys(side_cols_to_keep))]
+            side_cols_to_keep.extend([c for c in df_export_processed.columns if side_pattern.search(c)])
+            df_part_export = df_export_processed[list(OrderedDict.fromkeys(side_cols_to_keep))]
 
-            df_part_processed.to_csv(f"extracted_data_for_{side}_in_original_units.csv", index=False)
+            df_part_export.to_csv(
+                f"extracted_data_for_{side}_in_{export_mode_slug}.csv",
+                index=False,
+            )
 
-            df_part_converted = df_part_processed.copy()
-            for col in df_part_converted.columns:
-                if col not in [data_domain, 'NO'] and not col.startswith('Phase_'):
-                    df_part_converted[col] *= 1000
-            df_part_converted.to_csv(f"extracted_{side}_loads_multiplied_by_1000.csv", index=False)
-
-            if df_combined_converted.empty:
-                df_combined_converted = df_part_converted
+            if df_combined_export.empty:
+                df_combined_export = df_part_export
             else:
-                df_to_concat = df_part_converted.drop(columns=[data_domain])
-                df_combined_converted = pd.concat([df_combined_converted, df_to_concat], axis=1)
+                df_to_concat = df_part_export.drop(columns=[data_domain])
+                df_combined_export = pd.concat([df_combined_export, df_to_concat], axis=1)
 
-        df_combined_converted.to_csv("extracted_loads_of_all_selected_parts_in_converted_units.csv", index=False)
+        df_combined_export.to_csv(
+            f"extracted_loads_of_all_selected_parts_in_{export_mode_slug}.csv",
+            index=False,
+        )
 
         exporter = AnsysExporter(version=selected_version, ansys_base_path=ansys_base_path)
         if data_domain == 'FREQ':
-            exporter.create_harmonic_template(df_processed, data_domain)
+            exporter.create_harmonic_template(df_export_processed, data_domain, export_units=export_units)
         elif data_domain == 'TIME':
-            time_diffs = df['TIME'].diff().dropna()
-            sample_rate = 1 / time_diffs.mean() if not time_diffs.empty else 0
-            exporter.create_transient_template(df_processed, data_domain, sample_rate)
+            exporter.create_transient_template(df_export_processed, data_domain, export_units=export_units)
 
