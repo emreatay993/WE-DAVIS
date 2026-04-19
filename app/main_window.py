@@ -30,10 +30,16 @@ class MainWindow(QMainWindow):
         # Core application state
         self.df = None
         self.df_compare = None
+        self.raw_primary_df = None
+        self.raw_comparison_df = None
         self.data_domain = None
         self.raw_data_folder = None
         self.unit_context = {}
         self.comparison_unit_context = {}
+        self.raw_unit_context = {}
+        self.raw_comparison_unit_context = {}
+        self.active_display_units_by_family = {}
+        self.export_unit_mode = SettingsTab.EXPORT_SOURCE_UNITS
         
         # Core components
         self.plotter = Plotter()
@@ -207,11 +213,138 @@ class MainWindow(QMainWindow):
         for selector in selectors_to_block:
             selector.blockSignals(False)
 
+    def _derive_default_display_units(self, unit_context):
+        defaults = {}
+        for column_context in unit_context.values():
+            if column_context.display_unit is None or column_context.quantity_family == "unknown":
+                continue
+            defaults.setdefault(column_context.quantity_family, column_context.display_unit)
+        return defaults
+
+    def _apply_display_units_to_context(self, raw_context):
+        if not raw_context:
+            return {}
+
+        updated_context = {}
+        for column_name, column_context in raw_context.items():
+            if column_context.display_unit is None or column_context.quantity_family == "unknown":
+                updated_context[column_name] = column_context
+                continue
+
+            selected_display_unit = self.active_display_units_by_family.get(
+                column_context.quantity_family,
+                column_context.display_unit,
+            )
+            updated_context[column_name] = column_context.with_display_unit(selected_display_unit)
+
+        return updated_context
+
+    def _rebuild_display_unit_contexts(self):
+        self.unit_context = self._apply_display_units_to_context(self.raw_unit_context)
+        self.comparison_unit_context = self._apply_display_units_to_context(self.raw_comparison_unit_context)
+
+    def _build_unit_family_controls(self, unit_context):
+        family_controls = []
+        family_sources = {}
+        unsupported_source_units = []
+
+        for column_context in unit_context.values():
+            normalized_unit = column_context.normalized_unit
+            if normalized_unit is None:
+                continue
+
+            if column_context.quantity_family == "unknown":
+                if column_context.native_only and normalized_unit not in unsupported_source_units:
+                    unsupported_source_units.append(normalized_unit)
+                continue
+
+            family = column_context.quantity_family
+            if family not in family_sources:
+                selected_unit = self.active_display_units_by_family.get(
+                    family,
+                    column_context.display_unit,
+                )
+                family_sources[family] = []
+                family_controls.append(
+                    {
+                        "family": family,
+                        "label": family.title(),
+                        "compatible_units": column_context.compatible_display_units,
+                        "selected_unit": selected_unit,
+                        "source_units": family_sources[family],
+                    }
+                )
+
+            if normalized_unit not in family_sources[family]:
+                family_sources[family].append(normalized_unit)
+
+        return family_controls, unsupported_source_units
+
+    def _build_unit_summary_text(self, family_controls, unsupported_source_units):
+        if family_controls:
+            summary_parts = [
+                f"{control['label']}: {', '.join(control['source_units'])}"
+                for control in family_controls
+            ]
+            summary_text = "Detected source units by quantity family: " + "; ".join(summary_parts) + "."
+        else:
+            summary_text = "Detected source units by quantity family: none."
+
+        if unsupported_source_units:
+            summary_text += " Native-only source units: " + ", ".join(unsupported_source_units) + "."
+
+        return summary_text
+
+    def _refresh_settings_unit_controls(self):
+        family_controls, unsupported_source_units = self._build_unit_family_controls(self.raw_unit_context)
+        self.tab_settings.configure_unit_controls(
+            family_controls=family_controls,
+            summary_text=self._build_unit_summary_text(family_controls, unsupported_source_units),
+            export_unit_mode=self.export_unit_mode,
+        )
+
+    def _set_primary_dataset_state(self, data, folder_path, unit_context):
+        self.raw_primary_df = data.copy(deep=True)
+        self.df = data
+        self.raw_data_folder = folder_path
+        self.raw_unit_context = dict(unit_context)
+        self.active_display_units_by_family = self._derive_default_display_units(self.raw_unit_context)
+        self.export_unit_mode = SettingsTab.EXPORT_SOURCE_UNITS
+        self._rebuild_display_unit_contexts()
+
+    def _set_comparison_dataset_state(self, df_compare, unit_context_compare):
+        self.raw_comparison_df = df_compare.copy(deep=True)
+        self.df_compare = df_compare
+        self.raw_comparison_unit_context = dict(unit_context_compare)
+        self._rebuild_display_unit_contexts()
+
+    def apply_unit_preferences(self, display_units_by_family, export_unit_mode):
+        display_units_by_family = display_units_by_family or {}
+        detected_defaults = self._derive_default_display_units(self.raw_unit_context)
+        self.active_display_units_by_family = {
+            family: display_units_by_family.get(family, default_unit)
+            for family, default_unit in detected_defaults.items()
+        }
+
+        if export_unit_mode in {SettingsTab.EXPORT_SOURCE_UNITS, SettingsTab.EXPORT_DISPLAY_UNITS}:
+            self.export_unit_mode = export_unit_mode
+        else:
+            self.export_unit_mode = SettingsTab.EXPORT_SOURCE_UNITS
+
+        self._rebuild_display_unit_contexts()
+
+    def apply_unit_preferences_from_settings(self):
+        self.apply_unit_preferences(
+            self.tab_settings.get_display_unit_selections(),
+            self.tab_settings.get_export_unit_mode(),
+        )
+
     @QtCore.pyqtSlot(pd.DataFrame, str, str, object)
     def on_data_loaded(self, data, data_domain, folder_path, unit_context):
-        self.df, self.data_domain, self.raw_data_folder = data, data_domain, folder_path
-        self.unit_context = unit_context
+        self._set_primary_dataset_state(data, folder_path, unit_context)
+        self.data_domain = data_domain
         self.tab_interface_data.set_dataframe(self.df)
+        self._refresh_settings_unit_controls()
 
         num_folders = self.df['DataFolder'].nunique()
         if num_folders > 1:
@@ -274,20 +407,22 @@ class MainWindow(QMainWindow):
         if self.df is None:
             QMessageBox.warning(self, "Error", "Please load the primary data first.")
             self.df_compare = None  # Ensure compare df is cleared
+            self.raw_comparison_df = None
             self.comparison_unit_context = {}
+            self.raw_comparison_unit_context = {}
             return
 
         if self.data_domain not in df_compare.columns:
             QMessageBox.critical(self, "Domain Mismatch", f"Comparison data needs a '{self.data_domain}' column.")
             self.df_compare = None  # Ensure compare df is cleared
+            self.raw_comparison_df = None
             self.comparison_unit_context = {}
+            self.raw_comparison_unit_context = {}
             # Also clear the combobox
             self.plot_controller.update_compare_column_list()
             return
 
-        # Set the dataframe first
-        self.df_compare = df_compare
-        self.comparison_unit_context = unit_context_compare
+        self._set_comparison_dataset_state(df_compare, unit_context_compare)
 
         # Now, call the controller to update the column list based on common columns
         self.plot_controller.update_compare_column_list()

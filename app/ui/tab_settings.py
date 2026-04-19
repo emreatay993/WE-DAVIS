@@ -8,9 +8,13 @@ from .. import tooltips
 
 class SettingsTab(QtWidgets.QWidget):
     settings_changed = QtCore.pyqtSignal()
+    EXPORT_SOURCE_UNITS = "Source Units"
+    EXPORT_DISPLAY_UNITS = "Display Units"
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.display_unit_selectors_by_family = {}
+        self._unit_row_widgets = []
         self._setup_ui()
 
     def _setup_ui(self):
@@ -66,6 +70,26 @@ class SettingsTab(QtWidgets.QWidget):
 
         graphical_settings_group.setLayout(graphical_settings_layout)
 
+        # Units Group
+        self.units_group = QGroupBox("Units")
+        units_layout = QVBoxLayout()
+
+        self.unit_summary_label = QLabel("Detected quantity families will appear after loading data.")
+        self.unit_summary_label.setWordWrap(True)
+        units_layout.addWidget(self.unit_summary_label)
+
+        self.display_unit_rows_layout = QVBoxLayout()
+        self.display_unit_placeholder_label = QLabel("Load a dataset to configure display units.")
+        self.display_unit_rows_layout.addWidget(self.display_unit_placeholder_label)
+        units_layout.addLayout(self.display_unit_rows_layout)
+
+        self.export_unit_selector = self._create_selector(
+            [self.EXPORT_SOURCE_UNITS, self.EXPORT_DISPLAY_UNITS],
+            self.EXPORT_SOURCE_UNITS,
+        )
+        units_layout.addWidget(self._create_setting_row_widget("Export Units", self.export_unit_selector))
+        self.units_group.setLayout(units_layout)
+
         # Contact Label
         contact_label = QLabel("Please reach K. Emre Atay for bug reports or feature requests.")
 
@@ -73,12 +97,14 @@ class SettingsTab(QtWidgets.QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(data_processing_group)
         main_layout.addWidget(graphical_settings_group)
+        main_layout.addWidget(self.units_group)
         main_layout.addStretch()
         main_layout.addWidget(contact_label, alignment=QtCore.Qt.AlignBottom)
 
         # Styles
         data_processing_group.setStyleSheet(config_manager.GROUPBOX_STYLE)
         graphical_settings_group.setStyleSheet(config_manager.GROUPBOX_STYLE)
+        self.units_group.setStyleSheet(config_manager.GROUPBOX_STYLE)
 
         # Connections
         self.rolling_min_max_checkbox.stateChanged.connect(self.settings_changed)
@@ -90,6 +116,7 @@ class SettingsTab(QtWidgets.QWidget):
         self.hover_font_size_selector.currentIndexChanged.connect(self.settings_changed)
         self.hover_mode_selector.currentIndexChanged.connect(self.settings_changed)
         self.opacity_spin.valueChanged.connect(self.settings_changed)
+        self.export_unit_selector.currentIndexChanged.connect(self.settings_changed)
 
     def _create_selector(self, items, default):
         selector = QComboBox()
@@ -102,6 +129,60 @@ class SettingsTab(QtWidgets.QWidget):
         layout.addWidget(QLabel(label_text))
         layout.addWidget(widget)
         return layout
+
+    def _create_setting_row_widget(self, label_text, widget):
+        row_widget = QtWidgets.QWidget(self)
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.addWidget(QLabel(label_text))
+        row_layout.addWidget(widget)
+        return row_widget
+
+    def _set_selector_value(self, selector, value):
+        selector.blockSignals(True)
+        selector.setCurrentText(value)
+        selector.blockSignals(False)
+
+    def _clear_unit_rows(self):
+        while self._unit_row_widgets:
+            row_widget = self._unit_row_widgets.pop()
+            self.display_unit_rows_layout.removeWidget(row_widget)
+            row_widget.setParent(None)
+            row_widget.deleteLater()
+
+    def configure_unit_controls(self, family_controls, summary_text, export_unit_mode):
+        self._clear_unit_rows()
+        self.display_unit_selectors_by_family = {}
+
+        for control in family_controls:
+            family = control["family"]
+            selector = self._create_selector(control["compatible_units"], control["selected_unit"])
+            selector.setEnabled(len(control["compatible_units"]) > 1)
+            selector.currentIndexChanged.connect(self.settings_changed)
+
+            row_widget = self._create_setting_row_widget(
+                f"{control['label']} Display Unit",
+                selector,
+            )
+            self.display_unit_rows_layout.addWidget(row_widget)
+            self._unit_row_widgets.append(row_widget)
+            self.display_unit_selectors_by_family[family] = selector
+
+        self.display_unit_placeholder_label.setVisible(not family_controls)
+        self.unit_summary_label.setText(summary_text)
+        self._set_selector_value(
+            self.export_unit_selector,
+            export_unit_mode or self.EXPORT_SOURCE_UNITS,
+        )
+
+    def get_display_unit_selections(self):
+        return {
+            family: selector.currentText()
+            for family, selector in self.display_unit_selectors_by_family.items()
+        }
+
+    def get_export_unit_mode(self):
+        return self.export_unit_selector.currentText()
 
     # Slot to control visibility of dependent widgets
     @QtCore.pyqtSlot(int)

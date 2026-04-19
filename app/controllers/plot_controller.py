@@ -333,6 +333,8 @@ class PlotController(QtCore.QObject):
     # region Signal Slots
     @QtCore.pyqtSlot()
     def update_all_plots_from_settings(self):
+        if hasattr(self.main_window, "apply_unit_preferences_from_settings"):
+            self.main_window.apply_unit_preferences_from_settings()
         if self._get_df() is None: return
 
         settings_tab = self.main_window.tab_settings
