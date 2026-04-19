@@ -32,6 +32,8 @@ class MainWindow(QMainWindow):
         self.df_compare = None
         self.data_domain = None
         self.raw_data_folder = None
+        self.unit_context = {}
+        self.comparison_unit_context = {}
         
         # Core components
         self.plotter = Plotter()
@@ -205,9 +207,10 @@ class MainWindow(QMainWindow):
         for selector in selectors_to_block:
             selector.blockSignals(False)
 
-    @QtCore.pyqtSlot(pd.DataFrame, str, str)
-    def on_data_loaded(self, data, data_domain, folder_path):
+    @QtCore.pyqtSlot(pd.DataFrame, str, str, object)
+    def on_data_loaded(self, data, data_domain, folder_path, unit_context):
         self.df, self.data_domain, self.raw_data_folder = data, data_domain, folder_path
+        self.unit_context = unit_context
         self.tab_interface_data.set_dataframe(self.df)
 
         num_folders = self.df['DataFolder'].nunique()
@@ -266,22 +269,25 @@ class MainWindow(QMainWindow):
         """Restore window title when loading fails."""
         self.setWindowTitle("WE-DAVIS")
 
-    @QtCore.pyqtSlot(pd.DataFrame)
-    def on_comparison_data_loaded(self, df_compare):
+    @QtCore.pyqtSlot(pd.DataFrame, object)
+    def on_comparison_data_loaded(self, df_compare, unit_context_compare):
         if self.df is None:
             QMessageBox.warning(self, "Error", "Please load the primary data first.")
             self.df_compare = None  # Ensure compare df is cleared
+            self.comparison_unit_context = {}
             return
 
         if self.data_domain not in df_compare.columns:
             QMessageBox.critical(self, "Domain Mismatch", f"Comparison data needs a '{self.data_domain}' column.")
             self.df_compare = None  # Ensure compare df is cleared
+            self.comparison_unit_context = {}
             # Also clear the combobox
             self.plot_controller.update_compare_column_list()
             return
 
         # Set the dataframe first
         self.df_compare = df_compare
+        self.comparison_unit_context = unit_context_compare
 
         # Now, call the controller to update the column list based on common columns
         self.plot_controller.update_compare_column_list()
