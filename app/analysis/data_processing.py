@@ -78,8 +78,9 @@ def compute_sampling_rate_series(df: pd.DataFrame) -> pd.DataFrame:
     dt_df = compute_time_step_series(df)
     if dt_df.empty:
         return dt_df
-    sr = 1.0 / dt_df['Δt [s]']
-    sr = sr.replace([float('inf'), float('-inf'), pd.NA, pd.NaT], float('nan'))
+    with pd.option_context('mode.use_inf_as_na', True):
+        sr = 1.0 / dt_df['Δt [s]']
+    sr = sr.replace([pd.NA, pd.NaT], float('nan'))
     out = sr.to_frame(name='Sampling Rate [Hz]')
     out.index = dt_df.index
     out.index.name = 'Time [s]'

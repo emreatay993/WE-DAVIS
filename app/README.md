@@ -4,10 +4,9 @@ WE-DAVIS is a PyQt5 desktop application for inspecting mechanical load datasets 
 
 ## Core Capabilities
 - Load one or more raw data folders containing `full.pld` and `max.pld` pairs and automatically stitch them into a single pandas DataFrame.
-- Auto-detect supported source units from each `max.pld` header and project compatible quantity families into user-selected display units without mutating the loaded raw data.
 - Switch between frequency-domain and time-domain analysis with context-aware tooling (phase plots, spectrum views, Tukey windowing, sectioning, sampling-metric overlays).
 - Browse dataset folders, plot individual signals, compare runs, and inspect part loads and interface forces through dedicated tabs.
-- Export harmonized CSV files and generate Ansys Mechanical templates directly from the UI in either detected source units or the current display units.
+- Export harmonized CSV files and generate Ansys Mechanical templates directly from the UI with selectable ANSYS version support.
 - Control global Plotly styling (fonts, legend placement, hover behavior, opacity) without touching code.
 
 ## Quick Start
@@ -19,16 +18,9 @@ WE-DAVIS is a PyQt5 desktop application for inspecting mechanical load datasets 
 ## Data Expectations
 - Each selected folder should contain harmonized `.pld` exports with either a `FREQ` or `TIME` column.
 - The loader matches files by suffix, so names such as `PLD_DATA_0_full.pld` and `PLD_HEADER_DATA_max.pld` are valid inputs.
-- `max.pld` files supply channel labels plus the source-unit metadata used by the unit-aware workflow. Frequency-domain loads also expect matching `Phase_` columns; these are constructed automatically.
+- `max.pld` files supply channel labels. Frequency-domain loads also expect matching `Phase_` columns; these are constructed automatically.
 - Mixed domain folders are rejected for safety; reload data if you need to switch between TIME and FREQ datasets.
 - The app decorates every row with a `DataFolder` column to preserve provenance across merged runs.
-- The current ingestion path is `.pld`-only. `.log` input support is still deferred.
-
-## Unit-Aware Workflow
-- Source units are detected automatically from `max.pld`, including channel `UNIT` values and header columns such as `FREQ(Hz)`, `TIME(s)`, or `PHASE(deg)`.
-- `SettingsTab` exposes one display-unit selector per detected quantity family. There is no manual source-unit override in this version.
-- Unsupported or unknown units remain native-only and are reported in the Settings summary instead of being guessed or coerced.
-- `Export Units` lets users choose between `Source Units` and `Display Units`. Source-mode exports keep the detected raw units, while display-mode exports write the currently projected units.
 
 ## Project Layout
 - `main.py` is the entry point; it wires the Qt application, constructs `DataManager`, and shows `MainWindow`.

@@ -155,7 +155,8 @@ class DataManagerUnitMetadataTests(unittest.TestCase):
         self.assertEqual(data_domain, "TIME")
         self.assertEqual(list(unit_context), list(data.columns))
         self.assertEqual(list(data.columns[:5]), ["NO", "TIME", "I1 - STBD REAR MOUNT (CS-8012) T1", "I1 - PORT REAR MOUNT (CS-8013) R1", "I3-TT/FBS/IPS - TT Side (CS-8001) T1"])
-        self.assertIsNone(unit_context["TIME"].normalized_unit)
+        self.assertEqual(unit_context["TIME"].normalized_unit, "s")
+        self.assertEqual(unit_context["TIME"].quantity_family, "time")
         self.assertEqual(data["DataFolder"].iloc[0], self.time_sample.name)
 
     def test_comparison_load_emits_unit_context(self) -> None:

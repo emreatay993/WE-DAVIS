@@ -113,10 +113,13 @@ class DataManager(QtCore.QObject):
 
     def _build_column_layout(self, header_metadata, data_domain, column_count):
         """Determines the final column layout and unit context for a loaded dataset."""
+        domain_unit = header_metadata.domain_units.get(data_domain)
+        if domain_unit is None and data_domain == 'TIME':
+            domain_unit = 's'
         column_names = ['NO', data_domain]
         source_units_by_column = {
             'NO': None,
-            data_domain: header_metadata.domain_units.get(data_domain),
+            data_domain: domain_unit,
         }
         family_hints_by_column = {}
 

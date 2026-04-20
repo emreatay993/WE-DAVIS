@@ -247,6 +247,30 @@ class _Selector:
         return self._text
 
 
+class _Checkbox:
+    def __init__(self, checked: bool = False) -> None:
+        self._checked = checked
+
+    def isChecked(self) -> bool:
+        return self._checked
+
+
+class _LineEdit:
+    def __init__(self, text: str = "") -> None:
+        self._text = text
+
+    def text(self) -> str:
+        return self._text
+
+
+class _SpinBox:
+    def __init__(self, value: float = 0.5) -> None:
+        self._value = value
+
+    def value(self) -> float:
+        return self._value
+
+
 class ExportUnitModeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -271,6 +295,13 @@ class ExportUnitModeTests(unittest.TestCase):
             unit_context=projected_context,
             export_unit_mode=export_mode,
             active_display_units_by_family=display_units,
+            tab_part_loads=SimpleNamespace(
+                section_checkbox=_Checkbox(False),
+                section_min_input=_LineEdit(""),
+                section_max_input=_LineEdit(""),
+                tukey_checkbox=_Checkbox(False),
+                tukey_alpha_spin=_SpinBox(0.5),
+            ),
             tab_time_domain_represent=SimpleNamespace(
                 interval_selector=_Selector("180"),
                 current_plot_data={},
@@ -418,6 +449,56 @@ class ExportUnitModeTests(unittest.TestCase):
         self.assertAlmostEqual(exported_frame["Mount STBD T1"].iloc[0], 1.0, places=6)
         self.assertAlmostEqual(exported_frame["Mount STBD R1"].iloc[0], 0.5, places=6)
         self.assertAlmostEqual(exported_frame["Phase_Mount STBD T1"].iloc[0], 90.0, places=6)
+        self.assertIn("extracted_data_for_STBD_in_source_units.csv", captured_exports)
+        self.assertIn("extracted_loads_of_all_selected_parts_in_source_units.csv", captured_exports)
+
+    def test_ansys_export_accepts_time_domain_with_seconds_context(self) -> None:
+        df = pd.DataFrame(
+            {
+                "TIME": [0.0, 0.25],
+                "Mount STBD T1": [1.0, 2.0],
+                "Mount STBD R1": [0.5, 1.0],
+            }
+        )
+        raw_unit_context = {
+            "TIME": ColumnUnitContext.from_source_unit("TIME", "s", family_hint="time"),
+            "Mount STBD T1": ColumnUnitContext.from_source_unit("Mount STBD T1", "kN"),
+            "Mount STBD R1": ColumnUnitContext.from_source_unit("Mount STBD R1", "kN*m"),
+        }
+        handler, _ = self._build_handler(
+            df,
+            raw_unit_context,
+            data_domain="TIME",
+            export_mode=SettingsTab.EXPORT_SOURCE_UNITS,
+        )
+
+        captured_exports = {}
+
+        def _capture_to_csv(frame, path, *args, **kwargs):
+            captured_exports[path] = frame.copy(deep=True)
+            return None
+
+        with patch.object(ActionHandler, "_get_sides_for_export", return_value=(["STBD"], (232, r"C:\ANSYS"))), \
+                patch("app.controllers.action_handler.AnsysExporter") as exporter_cls, \
+                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv):
+            handler.handle_ansys_export()
+
+        exporter = exporter_cls.return_value
+        exporter.create_transient_template.assert_called_once()
+        exported_frame, exported_domain = exporter.create_transient_template.call_args.args[:2]
+        exported_units = exporter.create_transient_template.call_args.kwargs["export_units"]
+
+        self.assertEqual(exported_domain, "TIME")
+        self.assertEqual(
+            exported_units,
+            AnsysExportUnits(
+                domain_unit="s",
+                force_unit="kN",
+                moment_unit="kN*m",
+                phase_unit="deg",
+            ),
+        )
+        self.assertAlmostEqual(exported_frame["TIME"].iloc[1], 0.25, places=6)
         self.assertIn("extracted_data_for_STBD_in_source_units.csv", captured_exports)
         self.assertIn("extracted_loads_of_all_selected_parts_in_source_units.csv", captured_exports)
 
