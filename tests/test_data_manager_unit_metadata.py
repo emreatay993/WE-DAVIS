@@ -234,6 +234,33 @@ class DataManagerUnitMetadataTests(unittest.TestCase):
         self.assertEqual(unit_context["Custom Channel T1"].quantity_family, "displacement")
         self.assertEqual(unit_context["Custom Channel R1"].quantity_family, "force")
 
+    def test_loader_accepts_capitalized_full_and_max_suffixes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            self._write_pld_files(
+                temp_path,
+                full_text="""
+                | NO | FREQ | Y1 | Y2 |
+                _______________________
+                | 1 | 10.0 | 1.25 | 0.00 |
+                | 2 | 12.0 | 1.50 | 0.25 |
+                """,
+                max_text="""
+                | Interface Label | UNIT | MAGNITUDE | PHASE(deg) | FREQ(Hz) |
+                _______________________________________________________________
+                | Capitalized Channel T1 | mm | 1.25 | 0.00 | 10.0 |
+                """,
+                full_name="PLD_DATA_0_Full.pld",
+                max_name="PLD_HEADER_DATA_Max.pld",
+            )
+
+            data, data_domain, _, unit_context = self._load_primary_folder(temp_path)
+
+        self.assertEqual(data_domain, "FREQ")
+        self.assertEqual(list(unit_context), list(data.columns))
+        self.assertEqual(unit_context["FREQ"].normalized_unit, "Hz")
+        self.assertEqual(unit_context["Capitalized Channel T1"].normalized_unit, "mm")
+
     def _load_primary_folder(self, folder: Path):
         emitted = []
         failures = []
@@ -250,12 +277,19 @@ class DataManagerUnitMetadataTests(unittest.TestCase):
         self.assertEqual(len(emitted), 1)
         return emitted[0]
 
-    def _write_pld_files(self, folder: Path, full_text: str, max_text: str) -> None:
-        (folder / "PLD_DATA_0_full.pld").write_text(
+    def _write_pld_files(
+        self,
+        folder: Path,
+        full_text: str,
+        max_text: str,
+        full_name: str = "PLD_DATA_0_full.pld",
+        max_name: str = "PLD_HEADER_DATA_max.pld",
+    ) -> None:
+        (folder / full_name).write_text(
             textwrap.dedent(full_text).strip() + "\n",
             encoding="utf-8",
         )
-        (folder / "PLD_HEADER_DATA_max.pld").write_text(
+        (folder / max_name).write_text(
             textwrap.dedent(max_text).strip() + "\n",
             encoding="utf-8",
         )

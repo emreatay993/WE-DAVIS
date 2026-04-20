@@ -166,7 +166,12 @@ class DataManager(QtCore.QObject):
         return folder
 
     def _get_file_path(self, folder, file_suffix):
-        return [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(file_suffix)]
+        normalized_suffix = file_suffix.casefold()
+        return [
+            os.path.join(folder, f)
+            for f in os.listdir(folder)
+            if f.casefold().endswith(normalized_suffix)
+        ]
 
     def _read_pld_log_file(self, file_path):
         df = pd.read_csv(file_path, delimiter='|', skipinitialspace=True, skip_blank_lines=True)
