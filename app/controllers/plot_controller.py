@@ -413,19 +413,23 @@ class PlotController(QtCore.QObject):
 
     @dataclass
     class InterfaceDataOptions:
-        interface: str
-        side: str
+        interface_side_pairs: list[tuple[str, str]]
 
     def _snapshot_interface_data_options(self) -> "PlotController.InterfaceDataOptions":
         tab = self.main_window.tab_interface_data
+        if hasattr(tab, "selected_interface_side_pairs"):
+            interface_side_pairs = list(tab.selected_interface_side_pairs())
+        else:
+            interface = tab.interface_selector.currentText()
+            side = tab.side_selector.currentText()
+            interface_side_pairs = [(interface, side)] if interface and side else []
         return PlotController.InterfaceDataOptions(
-            interface=tab.interface_selector.currentText(),
-            side=tab.side_selector.currentText(),
+            interface_side_pairs=interface_side_pairs,
         )
 
     @dataclass
     class PartLoadsOptions:
-        side: str
+        sides: list[str]
         exclude: bool
         section_enabled: bool
         section_min_text: str
@@ -435,8 +439,13 @@ class PlotController(QtCore.QObject):
 
     def _snapshot_part_loads_options(self) -> "PlotController.PartLoadsOptions":
         tab = self.main_window.tab_part_loads
+        if hasattr(tab, "selected_sides"):
+            sides = list(tab.selected_sides())
+        else:
+            side = tab.side_filter_selector.currentText()
+            sides = [side] if side else []
         return PlotController.PartLoadsOptions(
-            side=tab.side_filter_selector.currentText(),
+            sides=sides,
             exclude=tab.exclude_checkbox.isChecked(),
             section_enabled=tab.section_checkbox.isChecked(),
             section_min_text=tab.section_min_input.text(),
@@ -474,7 +483,12 @@ class PlotController(QtCore.QObject):
 
     def _snapshot_time_domain_represent_options(self) -> "PlotController.TimeDomainRepresentOptions":
         tab_time = self.main_window.tab_time_domain_represent
-        side = self.main_window.tab_part_loads.side_filter_selector.currentText()
+        part_loads_tab = self.main_window.tab_part_loads
+        if hasattr(part_loads_tab, "selected_sides"):
+            selected_sides = part_loads_tab.selected_sides()
+            side = selected_sides[0] if selected_sides else ""
+        else:
+            side = part_loads_tab.side_filter_selector.currentText()
         return PlotController.TimeDomainRepresentOptions(
             frequency_text=tab_time.data_point_selector.currentText(),
             selected_side=side,
@@ -686,38 +700,101 @@ class PlotController(QtCore.QObject):
 
         tab = self.main_window.tab_interface_data
         opts = self._snapshot_interface_data_options()
-        interface = opts.interface
-        side = opts.side
-        if not interface or not side:
+        interface_side_pairs = opts.interface_side_pairs
+        if not interface_side_pairs:
+            tab.display_t_series_plot(
+                self.plotter.create_standard_figure(
+                    pd.DataFrame(),
+                    "Translational Components",
+                )
+            )
+            tab.display_r_series_plot(
+                self.plotter.create_standard_figure(
+                    pd.DataFrame(),
+                    "Rotational Components",
+                )
+            )
             return
 
-        t_cols = [
-            c for c in df.columns
-            if c.startswith(interface) and side in c and any(s in c for s in ["T1", "T2", "T3", "T2/T3"]) and "Phase_" not in c
-        ]
-        r_cols = [
-            c for c in df.columns
-            if c.startswith(interface) and side in c and any(s in c for s in ["R1", "R2", "R3", "R2/R3"]) and "Phase_" not in c
-        ]
+        t_frames = []
+        r_frames = []
+        t_contexts = {}
+        r_contexts = {}
+        use_prefixed_labels = len(interface_side_pairs) > 1
+        for interface, side in interface_side_pairs:
+            t_cols = [
+                c
+                for c in df.columns
+                if c.startswith(interface)
+                and side in c
+                and any(s in c for s in ["T1", "T2", "T3", "T2/T3"])
+                and "Phase_" not in c
+            ]
+            r_cols = [
+                c
+                for c in df.columns
+                if c.startswith(interface)
+                and side in c
+                and any(s in c for s in ["R1", "R2", "R3", "R2/R3"])
+                and "Phase_" not in c
+            ]
 
-        t_df = build_multi_series_for_single(df, columns=t_cols, data_domain=self._get_data_domain(), section_enabled=False)
-        r_df = build_multi_series_for_single(df, columns=r_cols, data_domain=self._get_data_domain(), section_enabled=False)
-        t_contexts = {column_name: self._get_column_context(column_name) for column_name in t_cols}
-        r_contexts = {column_name: self._get_column_context(column_name) for column_name in r_cols}
-        t_df = self._project_plot_frame(t_df, column_contexts=t_contexts)
-        r_df = self._project_plot_frame(r_df, column_contexts=r_contexts)
+            combo_label = f"{interface} - {side}"
+
+            if t_cols:
+                combo_contexts = {column_name: self._get_column_context(column_name) for column_name in t_cols}
+                projected = self._project_plot_frame(
+                    build_multi_series_for_single(
+                        df,
+                        columns=t_cols,
+                        data_domain=self._get_data_domain(),
+                        section_enabled=False,
+                    ),
+                    column_contexts=combo_contexts,
+                )
+                if use_prefixed_labels:
+                    projected = projected.rename(columns={column_name: f"{combo_label} - {column_name}" for column_name in projected.columns})
+                t_frames.append(projected)
+                for column_name, context in combo_contexts.items():
+                    trace_name = f"{combo_label} - {column_name}" if use_prefixed_labels else column_name
+                    t_contexts[trace_name] = context
+
+            if r_cols:
+                combo_contexts = {column_name: self._get_column_context(column_name) for column_name in r_cols}
+                projected = self._project_plot_frame(
+                    build_multi_series_for_single(
+                        df,
+                        columns=r_cols,
+                        data_domain=self._get_data_domain(),
+                        section_enabled=False,
+                    ),
+                    column_contexts=combo_contexts,
+                )
+                if use_prefixed_labels:
+                    projected = projected.rename(columns={column_name: f"{combo_label} - {column_name}" for column_name in projected.columns})
+                r_frames.append(projected)
+                for column_name, context in combo_contexts.items():
+                    trace_name = f"{combo_label} - {column_name}" if use_prefixed_labels else column_name
+                    r_contexts[trace_name] = context
+
+        t_df = pd.concat(t_frames, axis=1) if t_frames else pd.DataFrame()
+        r_df = pd.concat(r_frames, axis=1) if r_frames else pd.DataFrame()
+        if not t_df.empty:
+            t_df = self._apply_trace_metadata(t_df, column_contexts=t_contexts)
+        if not r_df.empty:
+            r_df = self._apply_trace_metadata(r_df, column_contexts=r_contexts)
 
         tab.display_t_series_plot(
             self.plotter.create_standard_figure(
                 t_df,
-                f"Translational Components - {side}",
+                "Translational Components" if use_prefixed_labels else f"Translational Components - {interface_side_pairs[0][1]}",
                 self._build_y_axis_title(t_contexts.values()),
             )
         )
         tab.display_r_series_plot(
             self.plotter.create_standard_figure(
                 r_df,
-                f"Rotational Components - {side}",
+                "Rotational Components" if use_prefixed_labels else f"Rotational Components - {interface_side_pairs[0][1]}",
                 self._build_y_axis_title(r_contexts.values()),
             )
         )
@@ -730,8 +807,20 @@ class PlotController(QtCore.QObject):
 
         opts = self._snapshot_part_loads_options()
         tab = self.main_window.tab_part_loads
-        side = opts.side
-        if not side:
+        sides = opts.sides
+        if not sides:
+            tab.display_t_series_plot(
+                self.plotter.create_standard_figure(
+                    pd.DataFrame(),
+                    "Translational Components",
+                )
+            )
+            tab.display_r_series_plot(
+                self.plotter.create_standard_figure(
+                    pd.DataFrame(),
+                    "Rotational Components",
+                )
+            )
             return
 
         exclude = opts.exclude
@@ -742,38 +831,71 @@ class PlotController(QtCore.QObject):
             if opts.tukey_enabled:
                 df_processed = apply_tukey_window(df_processed, opts.tukey_alpha)
 
-        t_cols = self._filter_part_load_cols(df_processed.columns, side, ["T1", "T2", "T3", "T2/T3"], exclude)
-        r_cols = self._filter_part_load_cols(df_processed.columns, side, ["R1", "R2", "R3", "R2/R3"], exclude)
-        t_df = build_multi_series_for_single(
-            df_processed,
-            columns=t_cols,
-            data_domain=self._get_data_domain(),
-            section_enabled=False,
-            tukey_enabled=False,
-        )
-        r_df = build_multi_series_for_single(
-            df_processed,
-            columns=r_cols,
-            data_domain=self._get_data_domain(),
-            section_enabled=False,
-            tukey_enabled=False,
-        )
-        t_contexts = {column_name: self._get_column_context(column_name) for column_name in t_cols}
-        r_contexts = {column_name: self._get_column_context(column_name) for column_name in r_cols}
-        t_df = self._project_plot_frame(t_df, column_contexts=t_contexts)
-        r_df = self._project_plot_frame(r_df, column_contexts=r_contexts)
+        t_frames = []
+        r_frames = []
+        t_contexts = {}
+        r_contexts = {}
+        use_prefixed_labels = len(sides) > 1
+        for side in sides:
+            t_cols = self._filter_part_load_cols(df_processed.columns, side, ["T1", "T2", "T3", "T2/T3"], exclude)
+            r_cols = self._filter_part_load_cols(df_processed.columns, side, ["R1", "R2", "R3", "R2/R3"], exclude)
+
+            if t_cols:
+                combo_contexts = {column_name: self._get_column_context(column_name) for column_name in t_cols}
+                projected = self._project_plot_frame(
+                    build_multi_series_for_single(
+                        df_processed,
+                        columns=t_cols,
+                        data_domain=self._get_data_domain(),
+                        section_enabled=False,
+                        tukey_enabled=False,
+                    ),
+                    column_contexts=combo_contexts,
+                )
+                if use_prefixed_labels:
+                    projected = projected.rename(columns={column_name: f"{side} - {column_name}" for column_name in projected.columns})
+                t_frames.append(projected)
+                for column_name, context in combo_contexts.items():
+                    trace_name = f"{side} - {column_name}" if use_prefixed_labels else column_name
+                    t_contexts[trace_name] = context
+
+            if r_cols:
+                combo_contexts = {column_name: self._get_column_context(column_name) for column_name in r_cols}
+                projected = self._project_plot_frame(
+                    build_multi_series_for_single(
+                        df_processed,
+                        columns=r_cols,
+                        data_domain=self._get_data_domain(),
+                        section_enabled=False,
+                        tukey_enabled=False,
+                    ),
+                    column_contexts=combo_contexts,
+                )
+                if use_prefixed_labels:
+                    projected = projected.rename(columns={column_name: f"{side} - {column_name}" for column_name in projected.columns})
+                r_frames.append(projected)
+                for column_name, context in combo_contexts.items():
+                    trace_name = f"{side} - {column_name}" if use_prefixed_labels else column_name
+                    r_contexts[trace_name] = context
+
+        t_df = pd.concat(t_frames, axis=1) if t_frames else pd.DataFrame()
+        r_df = pd.concat(r_frames, axis=1) if r_frames else pd.DataFrame()
+        if not t_df.empty:
+            t_df = self._apply_trace_metadata(t_df, column_contexts=t_contexts)
+        if not r_df.empty:
+            r_df = self._apply_trace_metadata(r_df, column_contexts=r_contexts)
 
         tab.display_t_series_plot(
             self.plotter.create_standard_figure(
                 t_df,
-                f"Translational Components - {side}",
+                "Translational Components" if use_prefixed_labels else f"Translational Components - {sides[0]}",
                 self._build_y_axis_title(t_contexts.values()),
             )
         )
         tab.display_r_series_plot(
             self.plotter.create_standard_figure(
                 r_df,
-                f"Rotational Components- {side}",
+                "Rotational Components" if use_prefixed_labels else f"Rotational Components- {sides[0]}",
                 self._build_y_axis_title(r_contexts.values()),
             )
         )

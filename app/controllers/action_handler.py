@@ -2,16 +2,17 @@
 
 import os
 import re
+import string
 from collections import OrderedDict
 
 import pandas as pd
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QListWidget, QAbstractItemView,
                              QListWidgetItem, QHBoxLayout, QPushButton, QMessageBox,
-                             QFileDialog, QComboBox, QLabel, QGroupBox)
+                             QFileDialog, QComboBox, QLabel)
 from scipy.signal.windows import tukey
 
-from ..analysis.ansys_exporter import AnsysExportUnits, AnsysExporter
+from ..analysis.ansys_exporter import AnsysExportUnits, AnsysExporter, _APPVOL_RAW_PATH_RE
 from ..analysis.data_processing import apply_data_section, apply_tukey_window
 from ..ui.tab_settings import SettingsTab
 from ..units import ColumnUnitContext, ConversionSpec, convert_dataframe_copy, convert_series
@@ -197,100 +198,100 @@ class ActionHandler(QtCore.QObject):
         ), None
 
     def _get_ansys_base_paths(self):
-        """Returns list of possible ANSYS installation base paths to search."""
+        """All plausible ANSYS base directories. Skips raw App Volumes paths."""
         paths = []
-        
-        # Check all available drive letters
-        for drive in "CDEFGHIJKLMNOPQRSTUVWXYZ":
-            paths.append(rf"{drive}:\Program Files\ANSYS Inc")
-            paths.append(rf"{drive}:\ANSYS Inc")
-            paths.append(rf"{drive}:\Ansys")
-        
-        # Also check environment variables that might point to ANSYS
-        for env_var in os.environ:
-            if 'ANSYS' in env_var.upper() or 'AWP_ROOT' in env_var.upper():
-                env_path = os.environ[env_var]
-                if os.path.isdir(env_path):
-                    # Get parent directory in case env points to version folder
-                    parent = os.path.dirname(env_path)
-                    if parent not in paths:
-                        paths.append(parent)
-                    if env_path not in paths:
-                        paths.append(env_path)
-        
+
+        def _add(path):
+            if path and path not in paths:
+                paths.append(path)
+
+        for drive in string.ascii_uppercase:
+            for subdir in ("Program Files\\ANSYS Inc", "ANSYS Inc", "Ansys"):
+                _add(rf"{drive}:\{subdir}")
+
+        for name, value in os.environ.items():
+            upper = name.upper()
+            if not (upper.startswith("AWP_ROOT") or "ANSYS" in upper):
+                continue
+            if not value:
+                continue
+            if _APPVOL_RAW_PATH_RE.search(value):
+                continue
+            if os.path.isdir(value):
+                _add(os.path.dirname(value.rstrip("\\/")))
+                _add(value)
+
         return paths
 
     def _get_available_ansys_versions(self):
-        """Scans for available ANSYS versions across all possible installation directories."""
-        available_versions = {}  # version -> base_path mapping
-        
-        for ansys_base_path in self._get_ansys_base_paths():
-            if os.path.exists(ansys_base_path):
-                try:
-                    for item in os.listdir(ansys_base_path):
-                        if item.startswith('v') and os.path.isdir(os.path.join(ansys_base_path, item)):
-                            # Extract version number (e.g., 'v232' -> 232)
-                            version_num = item[1:]  # Remove 'v' prefix
-                            if version_num.isdigit():
-                                version = int(version_num)
-                                # Store with the base path (first found wins)
-                                if version not in available_versions:
-                                    available_versions[version] = ansys_base_path
-                except Exception as e:
-                    print(f"Error scanning ANSYS versions in {ansys_base_path}: {e}")
-        
-        # Store the paths for later use
-        self._ansys_version_paths = available_versions
-        
-        # Return sorted list of versions (latest first)
-        return sorted(available_versions.keys(), reverse=True)
+        """Return ``version -> base_path`` for usable ANSYS installations."""
+        available = {}
+        for base in self._get_ansys_base_paths():
+            if not os.path.isdir(base):
+                continue
+            try:
+                entries = os.listdir(base)
+            except OSError as exc:
+                print(f"[ansys-vdi] Could not scan {base}: {exc}")
+                continue
+            for entry in entries:
+                if not entry.lower().startswith("v"):
+                    continue
+                version_text = entry[1:]
+                if not version_text.isdigit():
+                    continue
+                version = int(version_text)
+                dll = os.path.join(
+                    base,
+                    entry,
+                    "aisol",
+                    "Bin",
+                    "winx64",
+                    "Ansys.Mechanical.Embedding.dll",
+                )
+                if version not in available and os.path.isfile(dll):
+                    available[version] = base
+        return available
 
     def _get_sides_for_export(self):
-        """Creates and shows a dialog to select multiple sides for export and ANSYS version."""
-        all_sides = [self.main_window.tab_part_loads.side_filter_selector.itemText(i) for i in
-                     range(self.main_window.tab_part_loads.side_filter_selector.count())]
-        current_side = self.main_window.tab_part_loads.side_filter_selector.currentText()
+        """Prompt for export sides plus the ANSYS version/base path to use."""
+        all_sides = self.main_window.tab_part_loads.side_filter_selector.all_items()
+        pre_checked_sides = set(self.main_window.tab_part_loads.selected_sides())
+        available_versions = self._get_available_ansys_versions()
+        if not available_versions:
+            QMessageBox.critical(
+                self.main_window,
+                "No ANSYS Installation Found",
+                "No usable ANSYS install was detected on this machine.\n\n"
+                "On Omnissa Horizon this usually means the App Volumes package "
+                "carrying ANSYS is not attached for your user, or the machine "
+                "still exposes a raw SVROOT path that non-wrapped processes "
+                "cannot use.\n\n"
+                "Contact IT to provision ANSYS natively on this desktop pool.",
+            )
+            return None, None, None
 
         dialog = QDialog(self.main_window)
         dialog.setWindowTitle("Select Parts to Export")
         layout = QVBoxLayout(dialog)
-        
-        # Parts selection group
-        parts_group = QGroupBox("Select Parts")
-        parts_layout = QVBoxLayout()
+
         list_widget = QListWidget()
         list_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
         for side in all_sides:
             item = QListWidgetItem(side)
             list_widget.addItem(item)
-            if side == current_side:
+            if side in pre_checked_sides:
                 item.setSelected(True)
-        
-        parts_layout.addWidget(list_widget)
-        parts_group.setLayout(parts_layout)
-        
-        # ANSYS version selection group
-        version_group = QGroupBox("ANSYS Version")
-        version_layout = QVBoxLayout()
-        version_combo = QComboBox()
-        
-        available_versions = self._get_available_ansys_versions()
-        
-        if available_versions:
-            for version in available_versions:
-                # Store both version and path as tuple in item data
-                base_path = self._ansys_version_paths.get(version, r"C:\Program Files\ANSYS Inc")
-                version_combo.addItem(f"ANSYS v{version} ({base_path})", (version, base_path))
-            version_combo.setCurrentIndex(0)  # Select latest version by default
-        else:
-            version_combo.addItem("Use Latest Available", (None, None))
-        
-        version_layout.addWidget(QLabel("Select ANSYS version for template generation:"))
-        version_layout.addWidget(version_combo)
-        version_group.setLayout(version_layout)
+        layout.addWidget(list_widget)
 
-        # Buttons
+        layout.addWidget(QLabel("ANSYS version:"))
+        version_combo = QComboBox()
+        for version in sorted(available_versions.keys(), reverse=True):
+            base_path = available_versions[version]
+            version_combo.addItem(f"ANSYS v{version} ({base_path})", (version, base_path))
+        layout.addWidget(version_combo)
+
         button_layout = QHBoxLayout()
         confirm_button = QPushButton("Confirm")
         confirm_button.clicked.connect(dialog.accept)
@@ -299,15 +300,13 @@ class ActionHandler(QtCore.QObject):
         button_layout.addWidget(confirm_button)
         button_layout.addWidget(cancel_button)
 
-        layout.addWidget(parts_group)
-        layout.addWidget(version_group)
         layout.addLayout(button_layout)
 
         if dialog.exec_() == QDialog.Accepted:
             selected_sides = [item.text() for item in list_widget.selectedItems()]
-            version_data = version_combo.currentData()  # (version, base_path) tuple
-            return selected_sides, version_data
-        return None, (None, None)
+            selected_version, ansys_base_path = version_combo.currentData()
+            return selected_sides, selected_version, ansys_base_path
+        return None, None, None
 
     @QtCore.pyqtSlot()
     def handle_compare_data_selection(self):
@@ -376,11 +375,16 @@ class ActionHandler(QtCore.QObject):
             QMessageBox.warning(self.main_window, "No Data", "Please load data before exporting.")
             return
 
-        selected_sides, version_data = self._get_sides_for_export()
+        export_selection = self._get_sides_for_export()
+        if not export_selection:
+            return
+        if len(export_selection) == 2:
+            selected_sides, version_data = export_selection
+            selected_version, ansys_base_path = version_data
+        else:
+            selected_sides, selected_version, ansys_base_path = export_selection
         if not selected_sides:
             return
-        
-        selected_version, ansys_base_path = version_data
 
         cols_to_keep = [data_domain]
         for side in selected_sides:

@@ -1,11 +1,12 @@
 # File: app/ui/tab_part_loads.py
 
 from PyQt5 import QtWidgets, QtCore, QtWebEngineWidgets
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QSplitter, QComboBox,
+from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QSplitter,
                              QPushButton, QCheckBox, QDoubleSpinBox, QLineEdit, QLabel)
 from ..plotting.plotter import load_fig_to_webview
 from .. import tooltips
 from .. import config_manager
+from .widgets.checkable_combo_box import CheckableComboBox
 
 class PartLoadsTab(QtWidgets.QWidget):
     plot_parameters_changed = QtCore.pyqtSignal()
@@ -17,8 +18,10 @@ class PartLoadsTab(QtWidgets.QWidget):
 
     def _setup_ui(self):
         # Upper Controls
-        self.side_filter_selector = QComboBox()
-        self.side_filter_selector.setEditable(True)
+        self.side_filter_selector = CheckableComboBox()
+        self.side_filter_selector.set_noun("part", "parts")
+        self.side_filter_selector.set_placeholder("Select parts…")
+        self.side_filter_selector.setMinimumWidth(260)
 
         self.exclude_checkbox = QCheckBox(r"Filter out T2, T3, R2, and R3 from graphs")
 
@@ -75,7 +78,7 @@ class PartLoadsTab(QtWidgets.QWidget):
         main_layout.addWidget(splitter)
 
         # Connect signals
-        self.side_filter_selector.currentIndexChanged.connect(self.plot_parameters_changed)
+        self.side_filter_selector.selectionChanged.connect(self.plot_parameters_changed)
         self.exclude_checkbox.stateChanged.connect(self.plot_parameters_changed)
         self.tukey_checkbox.stateChanged.connect(self._on_tukey_toggled)
         self.tukey_alpha_spin.valueChanged.connect(self.plot_parameters_changed)
@@ -100,14 +103,10 @@ class PartLoadsTab(QtWidgets.QWidget):
             self.section_max_input.setVisible(False)
 
     def set_available_sides(self, sides, preserve_selection=True):
-        current_side = self.side_filter_selector.currentText() if preserve_selection else ""
-        self.side_filter_selector.blockSignals(True)
-        self.side_filter_selector.clear()
-        self.side_filter_selector.addItems(sides)
-        if sides:
-            target_side = current_side if current_side in sides else sides[0]
-            self.side_filter_selector.setCurrentIndex(self.side_filter_selector.findText(target_side))
-        self.side_filter_selector.blockSignals(False)
+        self.side_filter_selector.set_items(sides, preserve_selection=preserve_selection)
+
+    def selected_sides(self) -> list[str]:
+        return self.side_filter_selector.selected_items()
 
     @QtCore.pyqtSlot(int)
     def _on_tukey_toggled(self, state):

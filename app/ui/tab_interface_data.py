@@ -3,8 +3,10 @@
 import re
 from natsort import natsorted
 from PyQt5 import QtWidgets, QtCore, QtWebEngineWidgets
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QSplitter, QComboBox, QLabel, QSizePolicy
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QSizePolicy
 from ..plotting.plotter import load_fig_to_webview
+from .widgets.checkable_combo_box import CheckableComboBox
+
 
 class InterfaceDataTab(QtWidgets.QWidget):
     plot_parameters_changed = QtCore.pyqtSignal()
@@ -21,29 +23,43 @@ class InterfaceDataTab(QtWidgets.QWidget):
     def refresh_selectors(self, preserve_selection=True):
         """Rebuild interface and side selectors from the current dataframe."""
         if self.df is None:
-            self._set_combo_items(self.interface_selector, [], "")
-            self._set_combo_items(self.side_selector, [], "")
+            self.interface_selector.set_items([], preserve_selection=False)
+            self.side_selector.set_grouped_items([], preserve_selection=False)
             return
 
-        previous_interface = self.interface_selector.currentText() if preserve_selection else ""
-        previous_side = self.side_selector.currentText() if preserve_selection else ""
-
         interfaces = self._extract_interfaces()
-        selected_interface = self._set_combo_items(
-            self.interface_selector,
+        self.interface_selector.set_items(
             interfaces,
-            previous_interface,
+            preserve_selection=preserve_selection,
         )
+        self._rebuild_side_selector_from_checked_interfaces()
 
-        sides = self._get_sides_for_interface(selected_interface)
-        self._set_combo_items(self.side_selector, sides, previous_side)
+    def selected_interfaces(self):
+        """Return the list of currently-checked interface IDs."""
+        return self.interface_selector.selected_items()
+
+    def selected_sides(self):
+        """Return the list of currently-checked part sides."""
+        return self.side_selector.selected_items()
+
+    def selected_interface_side_pairs(self):
+        """Return the checked ``(interface, side)`` pairs from the grouped selector."""
+        return [
+            (interface_name, side_name)
+            for interface_name, side_name in self.side_selector.selected_grouped_items()
+            if interface_name
+        ]
 
     def _setup_ui(self):
         # Widgets
-        self.interface_selector = QComboBox()
-        self.interface_selector.setEditable(True)
-        self.side_selector = QComboBox()
-        self.side_selector.setEditable(True)
+        self.interface_selector = CheckableComboBox()
+        self.interface_selector.set_noun("interface", "interfaces")
+        self.interface_selector.set_placeholder("Select interfaces…")
+
+        self.side_selector = CheckableComboBox()
+        self.side_selector.set_noun("part side", "part sides")
+        self.side_selector.set_placeholder("Select part sides…")
+
         self.t_series_plot = QtWebEngineWidgets.QWebEngineView()
         self.t_series_plot.setContextMenuPolicy(QtCore.Qt.NoContextMenu)
         self.r_series_plot = QtWebEngineWidgets.QWebEngineView()
@@ -68,21 +84,29 @@ class InterfaceDataTab(QtWidgets.QWidget):
         main_layout.addWidget(splitter)
 
         # Connections
-        self.interface_selector.currentIndexChanged.connect(self._on_interface_changed)
-        self.side_selector.currentIndexChanged.connect(self.plot_parameters_changed)
+        self.interface_selector.selectionChanged.connect(self._on_interfaces_changed)
+        self.side_selector.selectionChanged.connect(self.plot_parameters_changed)
 
     # Private slots for internal logic
-    def _on_interface_changed(self):
-        self._populate_side_selector()
+    def _on_interfaces_changed(self):
+        self._rebuild_side_selector_from_checked_interfaces()
         self.plot_parameters_changed.emit()
 
-    # Helper methods to call
-    def _populate_side_selector(self):
-        current_interface = self.interface_selector.currentText()
-        current_side = self.side_selector.currentText()
-        sides = self._get_sides_for_interface(current_interface)
-        self._set_combo_items(self.side_selector, sides, current_side)
+    def _rebuild_side_selector_from_checked_interfaces(self):
+        """Rebuild the grouped side selector from the checked interfaces.
 
+        Each checked interface becomes a group header followed by its sides;
+        any previously-checked sides that still exist under a still-checked
+        interface stay checked (preserve_selection=True).
+        """
+        checked_interfaces = self.interface_selector.selected_items()
+        groups = [
+            (iface, self._get_sides_for_interface(iface))
+            for iface in checked_interfaces
+        ]
+        self.side_selector.set_grouped_items(groups, preserve_selection=True)
+
+    # Helper methods
     def _extract_interfaces(self):
         return natsorted(
             list(
@@ -111,22 +135,8 @@ class InterfaceDataTab(QtWidgets.QWidget):
             }
         )
 
-    @staticmethod
-    def _set_combo_items(combo_box, items, selected_text):
-        combo_box.blockSignals(True)
-        combo_box.clear()
-        combo_box.addItems(items)
-
-        if items:
-            target_text = selected_text if selected_text in items else items[0]
-            combo_box.setCurrentIndex(combo_box.findText(target_text))
-
-        combo_box.blockSignals(False)
-        return combo_box.currentText()
-
     def display_t_series_plot(self, fig):
         load_fig_to_webview(fig, self.t_series_plot)
 
     def display_r_series_plot(self, fig):
-
         load_fig_to_webview(fig, self.r_series_plot)

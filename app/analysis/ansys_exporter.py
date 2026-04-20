@@ -14,6 +14,12 @@ from PyQt5.QtWidgets import QMessageBox
 from ..units import convert_scalar, convert_series
 
 
+# Marker for Omnissa Horizon App Volumes raw package paths such as
+# ``D:\{guid}\SVROOT\...``. These raw paths are often not usable for .NET
+# dependency resolution outside the wrapped App Volumes process context.
+_APPVOL_RAW_PATH_RE = re.compile(r"SVROOT|\{[0-9a-fA-F-]{36}\}")
+
+
 @dataclass(frozen=True)
 class AnsysExportUnits:
     domain_unit: str
@@ -40,69 +46,78 @@ class AnsysExporter:
 
     def _get_ansys_root(self):
         """Returns the full path to the ANSYS version installation directory."""
-        if self.ansys_base_path:
-            return rf"{self.ansys_base_path}\v{self.version}"
-        else:
-            # Default fallback path
-            return rf"C:\Program Files\ANSYS Inc\v{self.version}"
+        base_path = self.ansys_base_path or r"C:\Program Files\ANSYS Inc"
+        return rf"{base_path}\v{self.version}"
 
     def _verify_ansys_dll(self):
         """Verifies that the required Ansys DLL exists before initialization."""
         if self.version is None:
-            return True  # Let ansys-mechanical-core find latest version
-        
+            return True
+
         ansys_root = self._get_ansys_root()
         dll_path = rf"{ansys_root}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
-        
-        if os.path.exists(dll_path):
-            print(f"✓ Found Ansys DLL: {dll_path}")
+
+        if os.path.isfile(dll_path):
+            print(f"Found Ansys DLL: {dll_path}")
             return True
-        else:
-            print(f"✗ DLL not found: {dll_path}")
-            QMessageBox.critical(None, 'Ansys DLL Not Found',
-                                 f"Cannot find required Ansys DLL:\n\n{dll_path}\n\n"
-                                 f"This may occur if:\n"
-                                 f"• ANSYS v{self.version} is not installed\n"
-                                 f"• ANSYS is installed as a virtual app (VDI)\n"
-                                 f"• ANSYS installation is incomplete\n\n"
-                                 f"Solutions:\n"
-                                 f"1. Try selecting a different ANSYS version\n"
-                                 f"2. Verify ANSYS is installed at: {ansys_root}")
-            return False
+
+        QMessageBox.critical(
+            None,
+            "Ansys DLL Not Found",
+            f"Cannot find required Ansys DLL:\n\n{dll_path}\n\n"
+            f"This usually means ANSYS v{self.version} is not installed at the "
+            f"expected logical path or the VDI image is exposing a broken "
+            f"virtualized installation.\n\nExpected install root:\n{ansys_root}",
+        )
+        return False
+
+    def _apply_native_ansys_environment(self):
+        """Prime env vars so ``ansys-mechanical-core`` can find the native install."""
+        if self.version is None:
+            return
+
+        ansys_root = self._get_ansys_root()
+        if not os.path.isdir(ansys_root):
+            return
+
+        os.environ[f"AWP_ROOT{self.version}"] = ansys_root
+        os.environ[f"ANSYS{self.version}_DIR"] = ansys_root
+
+        bin_dir = os.path.join(ansys_root, "aisol", "Bin", "winx64")
+        current_path = os.environ.get("PATH", "")
+        path_parts = [part for part in current_path.split(os.pathsep) if part]
+        if bin_dir not in path_parts:
+            os.environ["PATH"] = os.pathsep.join([bin_dir] + path_parts)
+
+    def _show_vdi_aware_init_error(self, exc):
+        version_text = f" (version {self.version})" if self.version else ""
+        message = (
+            f"Failed to initialize Ansys Mechanical{version_text}.\n\n"
+            "On Omnissa Horizon / App Volumes this is commonly caused by one of "
+            "these conditions:\n"
+            "1. ANSYS is provisioned as a raw virtual package path instead of a logical install path.\n"
+            "2. The selected version is not attached for this user session.\n"
+            "3. The package was captured with machine-wide env vars pointing at an SVROOT path.\n\n"
+            f"Error details:\n{exc}"
+        )
+        QMessageBox.critical(None, "Ansys Initialization Error", message)
 
     def _init_ansys_session(self):
         """Initializes a new Ansys Mechanical session."""
+        if not self._verify_ansys_dll():
+            return False
         try:
-            # Verify DLL exists before attempting to load
-            if not self._verify_ansys_dll():
-                return False
-            
+            self._apply_native_ansys_environment()
+
             print("Importing ansys-mechanical-core library...")
             import ansys.mechanical.core as mech
             from ansys.mechanical.core import global_variables
             print("Imported.")
 
-            # Set Ansys installation path explicitly to avoid VDI/virtual app path issues
-            if self.version is not None:
-                ansys_root = self._get_ansys_root()
-                if os.path.exists(ansys_root):
-                    # Set environment variables that ansys-mechanical-core uses to find DLLs
-                    os.environ[f'AWP_ROOT{self.version}'] = ansys_root
-                    print(f"Set AWP_ROOT{self.version}={ansys_root}")
-                    
-                    # Also set ANSYS{version}_DIR which some versions might need
-                    os.environ[f'ANSYS{self.version}_DIR'] = ansys_root
-                    print(f"Set ANSYS{self.version}_DIR={ansys_root}")
-                else:
-                    print(f"Warning: Ansys installation path not found: {ansys_root}")
-
             print("Starting Ansys Mechanical...")
-            # Initialize App with version if specified
             if self.version is not None:
-                print(f"Using ANSYS version: {self.version}")
                 self.app_ansys = mech.App(version=self.version)
             else:
-                print("Using latest available ANSYS version")
                 self.app_ansys = mech.App()
             print("Ansys Mechanical session started.")
 
@@ -116,31 +131,7 @@ class AnsysExporter:
             self.ExtAPI.Application.ActiveUnitSystem = self.Ansys.ACT.Interfaces.Common.MechanicalUnitSystem.StandardMKS
             return True
         except Exception as e:
-            version_text = f" (version {self.version})" if self.version else ""
-            
-            # Build detailed error message
-            error_msg = f"The selected ANSYS version{version_text} is not supported or produced errors during initialization.\n\n"
-            
-            # Check if it's a DLL path issue
-            error_str = str(e).lower()
-            if 'dll' in error_str or 'could not find' in error_str or 'file not found' in error_str:
-                if self.version:
-                    ansys_root = self._get_ansys_root()
-                    expected_dll_path = rf"{ansys_root}\aisol\Bin\winx64\Ansys.Mechanical.Embedding.dll"
-                    error_msg += f"DLL Loading Issue Detected:\n"
-                    error_msg += f"Expected DLL location: {expected_dll_path}\n"
-                    error_msg += f"Exists: {os.path.exists(expected_dll_path)}\n\n"
-                    error_msg += f"This may occur in VDI/virtual app environments where paths are redirected.\n\n"
-            
-            ansys_root = self._get_ansys_root() if self.version else "C:\\Program Files\\ANSYS Inc\\vXXX"
-            error_msg += f"Troubleshooting:\n"
-            error_msg += f"1. Verify ANSYS is installed at: {ansys_root}\n"
-            error_msg += f"2. Try selecting a different ANSYS version from the dropdown\n"
-            error_msg += f"3. Check that you have the correct ansys-mechanical-core package version\n"
-            error_msg += f"4. In VDI environments, ensure ANSYS is installed locally, not as a virtual app\n\n"
-            error_msg += f"Error details: {e}"
-            
-            QMessageBox.critical(None, 'Ansys Initialization Error', error_msg)
+            self._show_vdi_aware_init_error(e)
             return False
 
     def _close_ansys_session(self):
@@ -322,10 +313,14 @@ class AnsysExporter:
                 df_load_table_phase_fx = pd.DataFrame({'FREQ': list_of_all_frequencies,
                                                        'Phase_T1': interface_dicts_full[interface_name][
                                                            "Phase_T1"]}).set_index('FREQ')
+                phase_fx_radians = self._convert_phase_series_to_radians(
+                    df_load_table_phase_fx['Phase_T1'],
+                    export_units.phase_unit,
+                )
                 df_load_table_fx_real = pd.DataFrame(
-                    df_load_table_fx['T1'] * np.cos(df_load_table_phase_fx['Phase_T1']), columns=['Real_T1'])
+                    df_load_table_fx['T1'] * np.cos(phase_fx_radians), columns=['Real_T1'])
                 df_load_table_fx_imag = pd.DataFrame(
-                    df_load_table_fx['T1'] * np.sin(df_load_table_phase_fx['Phase_T1']), columns=['Imag_T1'])
+                    df_load_table_fx['T1'] * np.sin(phase_fx_radians), columns=['Imag_T1'])
 
                 df_load_table_fy = pd.DataFrame(
                     {'FREQ': list_of_all_frequencies, 'T2': interface_dicts_full[interface_name]["T2"]}).set_index(
@@ -333,10 +328,14 @@ class AnsysExporter:
                 df_load_table_phase_fy = pd.DataFrame({'FREQ': list_of_all_frequencies,
                                                        'Phase_T2': interface_dicts_full[interface_name][
                                                            "Phase_T2"]}).set_index('FREQ')
+                phase_fy_radians = self._convert_phase_series_to_radians(
+                    df_load_table_phase_fy['Phase_T2'],
+                    export_units.phase_unit,
+                )
                 df_load_table_fy_real = pd.DataFrame(
-                    df_load_table_fy['T2'] * np.cos(df_load_table_phase_fy['Phase_T2']), columns=['Real_T2'])
+                    df_load_table_fy['T2'] * np.cos(phase_fy_radians), columns=['Real_T2'])
                 df_load_table_fy_imag = pd.DataFrame(
-                    df_load_table_fy['T2'] * np.sin(df_load_table_phase_fy['Phase_T2']), columns=['Imag_T2'])
+                    df_load_table_fy['T2'] * np.sin(phase_fy_radians), columns=['Imag_T2'])
 
                 df_load_table_fz = pd.DataFrame(
                     {'FREQ': list_of_all_frequencies, 'T3': interface_dicts_full[interface_name]["T3"]}).set_index(
@@ -344,10 +343,14 @@ class AnsysExporter:
                 df_load_table_phase_fz = pd.DataFrame({'FREQ': list_of_all_frequencies,
                                                        'Phase_T3': interface_dicts_full[interface_name][
                                                            "Phase_T3"]}).set_index('FREQ')
+                phase_fz_radians = self._convert_phase_series_to_radians(
+                    df_load_table_phase_fz['Phase_T3'],
+                    export_units.phase_unit,
+                )
                 df_load_table_fz_real = pd.DataFrame(
-                    df_load_table_fz['T3'] * np.cos(df_load_table_phase_fz['Phase_T3']), columns=['Real_T3'])
+                    df_load_table_fz['T3'] * np.cos(phase_fz_radians), columns=['Real_T3'])
                 df_load_table_fz_imag = pd.DataFrame(
-                    df_load_table_fz['T3'] * np.sin(df_load_table_phase_fz['Phase_T3']), columns=['Imag_T3'])
+                    df_load_table_fz['T3'] * np.sin(phase_fz_radians), columns=['Imag_T3'])
 
                 list_of_mx_values = [self.Quantity(v, moment_quantity_unit) for v in interface_dicts_full[interface_name]["R1"]]
                 list_of_my_values = [self.Quantity(v, moment_quantity_unit) for v in interface_dicts_full[interface_name]["R2"]]
