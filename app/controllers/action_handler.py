@@ -14,7 +14,11 @@ from scipy.signal.windows import tukey
 
 from ..analysis.ansys_exporter import AnsysExportUnits, AnsysExporter, _APPVOL_RAW_PATH_RE
 from ..analysis.data_processing import apply_data_section, apply_tukey_window
-from ..ui.steady_state_cycle_estimator_dialog import SteadyStateCycleEstimatorDialog
+from ..analysis.steady_state_estimator import (
+    SteadyStateEstimateSnapshot,
+    estimate_cycles_to_steady_state,
+)
+from ..analysis.steady_state_time_history_export import resolve_frequency_to_hz
 from ..ui.tab_settings import SettingsTab
 from ..units import ColumnUnitContext, ConversionSpec, convert_dataframe_copy, convert_series
 
@@ -269,6 +273,13 @@ class ActionHandler(QtCore.QObject):
                 continue
         return 1.0
 
+    def _get_current_time_domain_frequency_summary(self):
+        selected_frequency = self._get_current_time_domain_frequency_hz()
+        frequency_context = getattr(self.main_window, "raw_unit_context", {}).get("FREQ")
+        frequency_hz = resolve_frequency_to_hz(selected_frequency, frequency_context)
+        frequency_unit = None if frequency_context is None else frequency_context.normalized_unit
+        return selected_frequency, frequency_unit, frequency_hz
+
     def _get_sides_for_export(self):
         """Prompt for export sides plus the ANSYS version/base path to use."""
         all_sides = self.main_window.tab_part_loads.side_filter_selector.all_items()
@@ -331,11 +342,100 @@ class ActionHandler(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def handle_open_steady_state_cycle_estimator(self):
+        from ..ui.steady_state_cycle_estimator_dialog import SteadyStateCycleEstimatorDialog
+
         initial_frequency_hz = self._get_current_time_domain_frequency_hz()
         dialog = SteadyStateCycleEstimatorDialog(
             parent=self.main_window,
             initial_excitation_frequency_hz=initial_frequency_hz,
             initial_mode_frequency_hz=initial_frequency_hz,
+        )
+        dialog.exec_()
+
+        try:
+            excitation_frequency_hz = dialog.excitation_frequency_spin.value()
+            mode_frequency_hz = (
+                excitation_frequency_hz
+                if dialog.assume_resonance_checkbox.isChecked()
+                else dialog.mode_frequency_spin.value()
+            )
+            estimate = estimate_cycles_to_steady_state(
+                damping_ratio=dialog.damping_ratio_spin.value(),
+                excitation_frequency_hz=excitation_frequency_hz,
+                mode_frequency_hz=mode_frequency_hz,
+                residual_fraction=dialog.residual_percent_spin.value() / 100.0,
+            )
+        except ValueError:
+            self.main_window.tab_time_domain_represent.latest_estimator_snapshot = None
+            return
+
+        self.main_window.tab_time_domain_represent.latest_estimator_snapshot = (
+            SteadyStateEstimateSnapshot(
+                estimate=estimate,
+                assume_resonance=dialog.assume_resonance_checkbox.isChecked(),
+            )
+        )
+
+    @QtCore.pyqtSlot()
+    def handle_open_steady_state_time_history_export(self):
+        from ..ui.steady_state_time_history_export_dialog import (
+            SteadyStateTimeHistoryExportDialog,
+        )
+
+        tab = self.main_window.tab_time_domain_represent
+        frequency_text = tab.data_point_selector.currentText()
+        if not frequency_text or "Select a frequency" in frequency_text:
+            QMessageBox.warning(
+                self.main_window,
+                "Selection Required",
+                "Please select a frequency before opening the steady-state time-history export.",
+            )
+            return
+
+        interval_text = tab.interval_selector.currentText()
+        if "Select an Interval [deg]" in interval_text:
+            QMessageBox.warning(
+                self.main_window,
+                "Selection Required",
+                "Please select a valid interval before opening the steady-state time-history export.",
+            )
+            return
+
+        try:
+            interval_degrees = int(interval_text)
+        except ValueError:
+            QMessageBox.warning(
+                self.main_window,
+                "Invalid Interval",
+                "The selected interval is not valid.",
+            )
+            return
+
+        if not getattr(tab, "current_plot_data", None):
+            QMessageBox.warning(
+                self.main_window,
+                "No Data",
+                "No time-domain plot data is available. Please select a frequency and part selection first.",
+            )
+            return
+
+        selected_frequency, _, frequency_hz = self._get_current_time_domain_frequency_summary()
+        if frequency_hz <= 0.0:
+            QMessageBox.warning(
+                self.main_window,
+                "Invalid Frequency",
+                "The selected frequency must resolve to a positive value in Hz.",
+            )
+            return
+
+        dialog = SteadyStateTimeHistoryExportDialog(
+            parent=self.main_window,
+            current_plot_data=tab.current_plot_data,
+            interval_degrees=interval_degrees,
+            selected_frequency_value=selected_frequency,
+            selected_frequency_context=getattr(self.main_window, "raw_unit_context", {}).get("FREQ"),
+            estimator_snapshot=getattr(tab, "latest_estimator_snapshot", None),
+            selected_parts=self.main_window.tab_part_loads.selected_sides(),
         )
         dialog.exec_()
 

@@ -10,11 +10,13 @@ class TimeDomainRepresentTab(QtWidgets.QWidget):
     plot_parameters_changed = QtCore.pyqtSignal()
     # Signal for data extraction
     extract_data_requested = QtCore.pyqtSignal()
+    steady_state_time_history_export_requested = QtCore.pyqtSignal()
     steady_state_estimator_requested = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_plot_data = {}
+        self.latest_estimator_snapshot = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -34,6 +36,7 @@ class TimeDomainRepresentTab(QtWidgets.QWidget):
                 self.interval_selector.addItem(str(i))
 
         self.extract_button = QPushButton("Extract Data at Each Interval as CSV file")
+        self.steady_state_time_history_export_button = QPushButton("Export Steady-State Time History as CSV file")
         self.steady_state_estimator_button = QPushButton("Estimate Cycles to Steady State")
         self.steady_state_estimator_button.setToolTip(tooltips.STEADY_STATE_CYCLE_ESTIMATOR)
 
@@ -47,6 +50,7 @@ class TimeDomainRepresentTab(QtWidgets.QWidget):
         extract_layout.addWidget(self.interval_selector)
         extract_layout.addStretch()
         extract_layout.addWidget(self.extract_button)
+        extract_layout.addWidget(self.steady_state_time_history_export_button)
         extract_layout.addWidget(self.steady_state_estimator_button)
 
         main_layout = QVBoxLayout(self)
@@ -57,6 +61,7 @@ class TimeDomainRepresentTab(QtWidgets.QWidget):
         # Connections
         self.data_point_selector.currentIndexChanged.connect(self.plot_parameters_changed)
         self.extract_button.clicked.connect(self.extract_data_requested)
+        self.steady_state_time_history_export_button.clicked.connect(self.steady_state_time_history_export_requested)
         self.steady_state_estimator_button.clicked.connect(self.steady_state_estimator_requested)
 
     def display_plot(self, fig):

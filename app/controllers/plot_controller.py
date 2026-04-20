@@ -972,6 +972,7 @@ class PlotController(QtCore.QObject):
                 column_name: {
                     "theta": df_time_domain.index.to_numpy(copy=True),
                     "y_data": df_time_domain[column_name].to_numpy(copy=True),
+                    "unit_context": column_contexts.get(column_name),
                 }
                 for column_name in df_time_domain.columns
             }

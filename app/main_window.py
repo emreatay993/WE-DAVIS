@@ -136,6 +136,9 @@ class MainWindow(QMainWindow):
         self.tab_compare_data.select_compare_data_requested.connect(self.action_handler.handle_compare_data_selection)
         self.tab_part_loads.export_to_ansys_requested.connect(self.action_handler.handle_ansys_export)
         self.tab_time_domain_represent.extract_data_requested.connect(self.action_handler.handle_time_domain_represent_export)
+        self.tab_time_domain_represent.steady_state_time_history_export_requested.connect(
+            self.action_handler.handle_open_steady_state_time_history_export
+        )
         self.tab_time_domain_represent.steady_state_estimator_requested.connect(
             self.action_handler.handle_open_steady_state_cycle_estimator
         )
@@ -314,6 +317,10 @@ class MainWindow(QMainWindow):
         self.active_display_units_by_family = self._derive_default_display_units(self.raw_unit_context)
         self.export_unit_mode = SettingsTab.EXPORT_SOURCE_UNITS
         self._rebuild_display_unit_contexts()
+        time_domain_tab = getattr(self, "tab_time_domain_represent", None)
+        if time_domain_tab is not None:
+            time_domain_tab.current_plot_data = {}
+            time_domain_tab.latest_estimator_snapshot = None
 
     def _set_comparison_dataset_state(self, df_compare, unit_context_compare):
         self.raw_comparison_df = df_compare.copy(deep=True)

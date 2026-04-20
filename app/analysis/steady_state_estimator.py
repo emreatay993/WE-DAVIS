@@ -23,6 +23,12 @@ class SteadyStateEstimate:
         return 1.0 - self.residual_fraction
 
 
+@dataclass(frozen=True)
+class SteadyStateEstimateSnapshot:
+    estimate: SteadyStateEstimate
+    assume_resonance: bool
+
+
 def estimate_cycles_to_steady_state(
     damping_ratio: float,
     excitation_frequency_hz: float,

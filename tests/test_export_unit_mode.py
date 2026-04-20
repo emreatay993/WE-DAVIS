@@ -226,6 +226,11 @@ from app.controllers.action_handler import ActionHandler
 from app.ui.tab_settings import SettingsTab
 from app.units import ColumnUnitContext
 
+# Keep the stub bound inside this module and inside ActionHandler, but let later
+# test modules import the real SettingsTab implementation.
+_reset_modules("app.ui.tab_settings")
+_drop_stubbed_modules("PyQt5", "PyQt5.QtCore", "PyQt5.QtWidgets")
+
 
 def _apply_display_units(unit_context, display_units):
     projected = {}
@@ -269,6 +274,7 @@ class _SpinBox:
 
     def value(self) -> float:
         return self._value
+
 
 
 class ExportUnitModeTests(unittest.TestCase):
