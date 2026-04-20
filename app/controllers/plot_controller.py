@@ -479,20 +479,31 @@ class PlotController(QtCore.QObject):
     @dataclass
     class TimeDomainRepresentOptions:
         frequency_text: str
-        selected_side: str
+        selected_sides: list[str]
+        exclude: bool
 
     def _snapshot_time_domain_represent_options(self) -> "PlotController.TimeDomainRepresentOptions":
         tab_time = self.main_window.tab_time_domain_represent
         part_loads_tab = self.main_window.tab_part_loads
         if hasattr(part_loads_tab, "selected_sides"):
-            selected_sides = part_loads_tab.selected_sides()
-            side = selected_sides[0] if selected_sides else ""
+            sides = list(part_loads_tab.selected_sides())
         else:
             side = part_loads_tab.side_filter_selector.currentText()
+            sides = [side] if side else []
         return PlotController.TimeDomainRepresentOptions(
             frequency_text=tab_time.data_point_selector.currentText(),
-            selected_side=side,
+            selected_sides=sides,
+            exclude=part_loads_tab.exclude_checkbox.isChecked(),
         )
+
+    def _format_selected_sides_title(self, sides: list[str]) -> str:
+        if not sides:
+            return "selected parts"
+        if len(sides) == 1:
+            return sides[0]
+        if len(sides) <= 3:
+            return ", ".join(sides)
+        return f"{len(sides)} selected parts"
 
     def _should_exclude_component(self, col_name: str) -> bool:
         """
@@ -914,34 +925,43 @@ class PlotController(QtCore.QObject):
                 return
             freq = float(freq_text)
 
-            selected_side = opts.selected_side
-            if not selected_side:
+            selected_sides = opts.selected_sides
+            if not selected_sides:
                 tab.display_plot(go.Figure())
                 return
-
-            side_pattern = re.compile(rf"\b{re.escape(selected_side)}\b")
-            plot_cols = [
-                c for c in df.columns
-                if side_pattern.search(c)
-                and not c.startswith("Phase_")
-                and any(s in c for s in ["T1", "T2", "T3", "R1", "R2", "R3", "T2/T3", "R2/R3"])
-            ]
 
             theta = np.linspace(0, 360, 361)
             rads = np.radians(theta)
             plot_data = {}
+            column_contexts = {}
             data_at_freq = df[df["FREQ"] == freq].iloc[0]
+            required_components = ["T1", "T2", "T3", "R1", "R2", "R3", "T2/T3", "R2/R3"]
+            use_prefixed_labels = len(selected_sides) > 1
 
-            for col in plot_cols:
-                phase_col = f"Phase_{col}"
-                if phase_col in data_at_freq:
+            for side in selected_sides:
+                side_cols = self._filter_part_load_cols(
+                    df.columns,
+                    side,
+                    required_components,
+                    opts.exclude,
+                )
+                for col in side_cols:
+                    phase_col = f"Phase_{col}"
+                    if phase_col not in data_at_freq:
+                        continue
                     phase_context = self._get_column_context(phase_col)
                     phase_radians = self._convert_scalar_to_unit(data_at_freq[phase_col], phase_context, "rad")
-                    plot_data[col] = data_at_freq[col] * np.cos(rads - phase_radians)
+                    trace_name = f"{side} - {col}" if use_prefixed_labels else col
+                    plot_data[trace_name] = data_at_freq[col] * np.cos(rads - phase_radians)
+                    column_contexts[trace_name] = self._get_column_context(col)
+
+            if not plot_data:
+                tab.current_plot_data = {}
+                tab.display_plot(go.Figure())
+                return
 
             df_time_domain = pd.DataFrame(plot_data, index=theta)
             df_time_domain.index.name = "Theta [deg]"
-            column_contexts = {column_name: self._get_column_context(column_name) for column_name in plot_cols}
             df_time_domain = self._project_plot_frame(
                 df_time_domain,
                 column_contexts=column_contexts,
@@ -960,10 +980,11 @@ class PlotController(QtCore.QObject):
             displayed_freq = self._convert_scalar_for_context(freq, frequency_context)
             displayed_freq_text = f"{displayed_freq:g}" if isinstance(displayed_freq, (int, float, np.floating)) else f"{displayed_freq}"
             frequency_unit = None if frequency_context is None else (frequency_context.display_unit or frequency_context.normalized_unit)
+            selected_sides_label = self._format_selected_sides_title(selected_sides)
             if frequency_unit:
-                title = f"Time Domain Representation at {displayed_freq_text} {frequency_unit} for {selected_side}"
+                title = f"Time Domain Representation at {displayed_freq_text} {frequency_unit} for {selected_sides_label}"
             else:
-                title = f"Time Domain Representation at {displayed_freq_text} for {selected_side}"
+                title = f"Time Domain Representation at {displayed_freq_text} for {selected_sides_label}"
             fig = self.plotter.create_standard_figure(
                 df_time_domain,
                 title,
