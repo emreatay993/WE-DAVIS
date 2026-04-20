@@ -14,6 +14,7 @@ from scipy.signal.windows import tukey
 
 from ..analysis.ansys_exporter import AnsysExportUnits, AnsysExporter, _APPVOL_RAW_PATH_RE
 from ..analysis.data_processing import apply_data_section, apply_tukey_window
+from ..ui.steady_state_cycle_estimator_dialog import SteadyStateCycleEstimatorDialog
 from ..ui.tab_settings import SettingsTab
 from ..units import ColumnUnitContext, ConversionSpec, convert_dataframe_copy, convert_series
 
@@ -253,6 +254,21 @@ class ActionHandler(QtCore.QObject):
                     available[version] = base
         return available
 
+    def _get_current_time_domain_frequency_hz(self):
+        tab = self.main_window.tab_time_domain_represent
+        candidate_texts = [tab.data_point_selector.currentText()]
+        candidate_texts.extend(
+            tab.data_point_selector.itemText(index)
+            for index in range(1, tab.data_point_selector.count())
+        )
+
+        for text in candidate_texts:
+            try:
+                return float(text)
+            except (TypeError, ValueError):
+                continue
+        return 1.0
+
     def _get_sides_for_export(self):
         """Prompt for export sides plus the ANSYS version/base path to use."""
         all_sides = self.main_window.tab_part_loads.side_filter_selector.all_items()
@@ -312,6 +328,16 @@ class ActionHandler(QtCore.QObject):
     def handle_compare_data_selection(self):
         """Handles the request to load comparison data."""
         self.data_manager.load_comparison_data()
+
+    @QtCore.pyqtSlot()
+    def handle_open_steady_state_cycle_estimator(self):
+        initial_frequency_hz = self._get_current_time_domain_frequency_hz()
+        dialog = SteadyStateCycleEstimatorDialog(
+            parent=self.main_window,
+            initial_excitation_frequency_hz=initial_frequency_hz,
+            initial_mode_frequency_hz=initial_frequency_hz,
+        )
+        dialog.exec_()
 
     @QtCore.pyqtSlot()
     def handle_time_domain_represent_export(self):

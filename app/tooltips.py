@@ -63,3 +63,14 @@ which one to use. If a version fails, try selecting a different version.<br><br>
 <i>Requires ansys-mechanical-core package to be installed and licensed. 
 Applies current Section Data and Tukey Window settings if enabled.</i>
 """
+
+STEADY_STATE_CYCLE_ESTIMATOR = """
+<b>Estimate how many transient cycles are needed to reach steady state.</b><br><br>
+Uses the classical startup-transient decay envelope for a damped modal response.<br><br>
+<b>Estimator basis:</b><br>
+&#8226; t = ln(1 / r) / (zeta * omega_n)<br>
+&#8226; N = f_exc * t<br><br>
+At exact resonance, the required cycle count depends mainly on damping, while the
+frequency changes the required run time.<br><br>
+<i>Opens a helper dialog with inputs, formulas, caveats, and references.</i>
+"""

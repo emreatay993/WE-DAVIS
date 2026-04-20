@@ -136,6 +136,9 @@ class MainWindow(QMainWindow):
         self.tab_compare_data.select_compare_data_requested.connect(self.action_handler.handle_compare_data_selection)
         self.tab_part_loads.export_to_ansys_requested.connect(self.action_handler.handle_ansys_export)
         self.tab_time_domain_represent.extract_data_requested.connect(self.action_handler.handle_time_domain_represent_export)
+        self.tab_time_domain_represent.steady_state_estimator_requested.connect(
+            self.action_handler.handle_open_steady_state_cycle_estimator
+        )
 
         # Tab Change Signal (Refresh plots when tab becomes active)
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
