@@ -2,9 +2,9 @@
 
 Change window: commits from 2026-04-11 through 2026-04-21.
 
-Reviewed commit range: `e97c3bce0115b60786960dcdda1262ef6b24013f..4873064`.
+Reviewed commit range: `e97c3bce0115b60786960dcdda1262ef6b24013f..b7b3f5f`.
 
-The commits in this window landed on 2026-04-19 and 2026-04-20.
+The commits in this window landed on 2026-04-19, 2026-04-20, and 2026-04-21.
 
 ## For Users
 
@@ -14,6 +14,8 @@ The commits in this window landed on 2026-04-19 and 2026-04-20.
 - Improved PLD filename handling so capitalized `.PLD` suffixes are accepted.
 - Fixed selector refresh behavior after loading a new dataset.
 - Restored unit-aware loading for multi-select tabs.
+- Refined multi-select load controls.
+- Corrected units in the transient sample dataset.
 
 ### Units and Export Behavior
 
@@ -21,16 +23,26 @@ The commits in this window landed on 2026-04-19 and 2026-04-20.
 - Added plot unit projection so charts can present converted units consistently.
 - Updated ANSYS export behavior to honor the selected export unit mode.
 - Defaulted ANSYS export `TIME` values to seconds when the source data does not provide a time unit.
+- Added Settings-tab guidance explaining how CSV exports use Source Units and Display Units.
+- Updated Full Data CSV export confirmation to state that it uses the current display units.
+- Updated the Extract Data at Each Interval CSV export so unit-aware values also carry unit labels in the CSV headers.
+- Added tooltip and confirmation text showing that the interval CSV export follows Settings > Export Units.
 
 ### Steady-State Workflows
 
 - Added steady-state cycle estimator tools.
 - Added a steady-state time-history export workflow.
 - Improved multi-part time-domain reconstruction.
+- Added steady-state soft-start smoothing for exported steady-state time histories.
+- Added soft-start controls, validation, help text, and documentation for the steady-state export dialog.
+- Made the steady-state time-history export dialog maximizable/fullscreenable.
+- Added `K` and `L` Plotly preview shortcuts in the steady-state export dialog for legend placement and visibility.
+- Rendered steady-state estimator help as HTML.
 
 ### Fixes and Cleanup
 
 - Removed a sampling-rate FutureWarning.
+- Cleaned stale offline packaging artifacts from the tracked tree.
 
 ## For Developers
 
@@ -46,16 +58,21 @@ The commits in this window landed on 2026-04-19 and 2026-04-20.
 - Added steady-state cycle estimator and time-history export dialogs.
 - Added a reusable checkable combo box widget for multi-select UI flows.
 - Updated action handling, main window wiring, and tab integrations for the new workflows.
+- Added a reusable steady-state soft-start export helper and integrated it with the export dialog.
+- Added scoped keyboard shortcut wiring for the steady-state export preview.
 
 ### Tests and Regression Coverage
 
 - Added tests for unit contracts, data manager unit metadata, settings unit controls, plot unit projection, export unit mode, and steady-state time-history export.
 - Added package test initialization for the new regression suite.
+- Added regression coverage for soft-start smoothing, fullscreen window controls, Plotly shortcut actions, and CSV unit-labeled interval exports.
 
 ### Documentation and Repository Hygiene
 
 - Updated developer and README documentation for the new workflows and sample data.
 - Archived the completed unit-aware implementation packet set.
+- Added and closed the steady-state soft-start smoothing packet set.
+- Added plan-specific references for the steady-state soft-start work.
 - Ignored local generated artifacts.
 - Removed stale offline-build helper artifacts from the tracked tree.
 
@@ -87,3 +104,25 @@ The commits in this window landed on 2026-04-19 and 2026-04-20.
 - `4b338d9` Support multi-part time-domain reconstruction
 - `a017d4d` Handle capitalized PLD suffixes
 - `4873064` Add steady-state time-history export workflow
+- `1f14223` docs: add recent changelog
+- `5271acf` ui: refine multiselect load controls
+- `989ef8d` ui: render steady-state estimator help as html
+- `374ce17` data: correct transient sample units
+- `ffbff9d` build: clean stale offline packaging artifacts
+- `834cf6f` Add steady-state soft-start work packets
+- `acc41c9` Add steady-state soft-start helper
+- `483e71c` Add P01 soft-start wrap-up
+- `ff011e4` Remediate P01 wrap-up format
+- `d526629` Fix P01 wrap-up verdict format
+- `28b331e` Record P01 packet acceptance
+- `c19930c` Add soft-start controls to steady-state export dialog
+- `a71e8e9` Add P02 soft-start controls wrap-up
+- `a328645` Fix P02 wrap-up verdict format
+- `0c730c5` Record P02 packet acceptance
+- `a5386d6` Document steady-state soft-start smoothing
+- `f40c4e2` Add P03 wrap-up
+- `16541db` Fix P03 wrap-up verdict format
+- `516e5b4` Add plan-specific steady-state references
+- `dc60d8b` Update P03 wrap-up for reference remediation
+- `e5e8910` Record P03 packet acceptance
+- `b7b3f5f` Improve time-history export UX and unit labeling
