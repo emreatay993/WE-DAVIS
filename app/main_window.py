@@ -20,6 +20,7 @@ from .plotting.plotter import Plotter
 from . import config_manager
 from .controllers.plot_controller import PlotController
 from .controllers.action_handler import ActionHandler
+from .version import APP_DISPLAY_NAME
 
 
 class MainWindow(QMainWindow):
@@ -67,8 +68,14 @@ class MainWindow(QMainWindow):
             # it will pass it back to the default handler.
             super().keyPressEvent(event)
 
+    def _set_window_title(self, detail=None):
+        if detail:
+            self.setWindowTitle(f"{APP_DISPLAY_NAME} - {detail}")
+        else:
+            self.setWindowTitle(APP_DISPLAY_NAME)
+
     def _setup_ui(self):
-        self.setWindowTitle("WE-DAVIS")
+        self._set_window_title()
         self.setMinimumSize(1200, 800)
         icon_path = os.path.join("resources", "icons", "app_icon.ico")
         if os.path.exists(icon_path): self.setWindowIcon(QIcon(icon_path))
@@ -359,12 +366,12 @@ class MainWindow(QMainWindow):
         num_folders = self.df['DataFolder'].nunique()
         if num_folders > 1:
             parent = os.path.basename(os.path.dirname(self.raw_data_folder))
-            title = f"WE-DAVIS - (Directory: {parent} | {num_folders} Data Folders Loaded)"
+            title_detail = f"(Directory: {parent} | {num_folders} Data Folders Loaded)"
         else:
             parent = os.path.basename(os.path.dirname(self.raw_data_folder))
             selected = os.path.basename(self.raw_data_folder)
-            title = f"WE-DAVIS - (Directory: {parent} | Data Folder: {selected})"
-        self.setWindowTitle(title)
+            title_detail = f"(Directory: {parent} | Data Folder: {selected})"
+        self._set_window_title(title_detail)
 
         self.dock.set_root_path(self.raw_data_folder)
 
@@ -391,26 +398,26 @@ class MainWindow(QMainWindow):
             self.tab_settings.rolling_min_max_checkbox.blockSignals(False)
 
         # Show processing status before generating plots
-        self.setWindowTitle("WE-DAVIS - Processing data and generating plots...")
+        self._set_window_title("Processing data and generating plots...")
         QtWidgets.QApplication.processEvents()  # Force UI update
         
         self.plot_controller.update_all_plots_from_settings()
         
         # Restore the final title after processing
-        self.setWindowTitle(title)
+        self._set_window_title(title_detail)
 
     @QtCore.pyqtSlot(int, int, str)
     def on_loading_progress(self, current_idx, total_folders, folder_name):
         """Update window title to show loading progress."""
         if total_folders > 1:
-            self.setWindowTitle(f"WE-DAVIS - Loading... (Folder {current_idx}/{total_folders}: {folder_name})")
+            self._set_window_title(f"Loading... (Folder {current_idx}/{total_folders}: {folder_name})")
         else:
-            self.setWindowTitle(f"WE-DAVIS - Loading... ({folder_name})")
+            self._set_window_title(f"Loading... ({folder_name})")
 
     @QtCore.pyqtSlot(str)
     def on_data_load_failed(self, error_message):
         """Restore window title when loading fails."""
-        self.setWindowTitle("WE-DAVIS")
+        self._set_window_title()
 
     @QtCore.pyqtSlot(pd.DataFrame, object)
     def on_comparison_data_loaded(self, df_compare, unit_context_compare):

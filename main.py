@@ -11,11 +11,14 @@ from PyQt5.QtCore import QTimer
 
 from app.data_manager import DataManager
 from app.main_window import MainWindow
+from app.version import APP_NAME, APP_VERSION
 
 if __name__ == "__main__":
     # 1. Create the application instance
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
 
     # 2. Create the main objects
     data_manager = DataManager()

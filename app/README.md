@@ -35,6 +35,8 @@ WE-DAVIS is a PyQt5 desktop application for inspecting mechanical load datasets 
 See `app/FILE_INDEX.md` for a detailed inventory and `app/ARCHITECTURE.md` for the full architectural overview.
 
 ## Additional Resources
+- `../docs/WE-DAVIS_v0.9_User_Showcase.md`: user-facing summary of recent v0.9 capabilities.
+- `../docs/CHANGELOG_2026-04-21.md`: detailed changelog for the recent development window.
 - `START_HERE.md`: onboarding checklist for new contributors.
 - `DETAILED_USER_MANUAL.md`: end-user walkthrough of every tab and export.
 - `SIGNAL_SLOT_REFERENCE.md`: mapping of all Qt signal connections.

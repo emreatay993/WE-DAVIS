@@ -39,6 +39,8 @@ High-Level Workflow
 
 Where To Go Next
 
+- User v0.9 showcase: docs/WE-DAVIS_v0.9_User_Showcase.md
+- Recent changelog: docs/CHANGELOG_2026-04-21.md
 - Architecture: docs/Architecture.md
 - Data flow and signals: docs/DataFlow-and-Signals.md
 - UI guide: docs/UI-Guide.md

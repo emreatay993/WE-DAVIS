@@ -1,0 +1,6 @@
+"""Application version metadata."""
+
+APP_NAME = "WE-DAVIS"
+APP_VERSION = "0.9"
+APP_VERSION_LABEL = f"v{APP_VERSION}"
+APP_DISPLAY_NAME = f"{APP_NAME} {APP_VERSION_LABEL}"
