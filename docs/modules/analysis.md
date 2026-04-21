@@ -32,6 +32,38 @@ app/analysis/data_processing.py
 - build_multi_series_for_single(df, columns, data_domain, section_enabled=False, t_min_text='', t_max_text='', tukey_enabled=False, tukey_alpha=0.1) → DataFrame
   - Multi-column single-folder builder with optional sectioning and Tukey (TIME)
 
+app/analysis/steady_state_estimator.py
+
+- estimate_cycles_to_steady_state(damping_ratio, excitation_frequency_hz, mode_frequency_hz=None, residual_fraction=0.01) → SteadyStateEstimate
+  - Estimates startup-transient decay using the damped modal envelope q_tr(t) ~ exp(-zeta * omega_n * t)
+  - General estimate: t_required = ln(1 / r) / (zeta * omega_n), then N_cycles = f_exc * t_required
+  - Exact-resonance shorthand: N = ln(1 / r) / (2*pi*zeta)
+  - Example: zeta = 0.02 and r = 0.01 gives N = 36.65, rounded up to 37 whole cycles
+  - The estimate remains conservative; soft-start smoothing can help load introduction and convergence but is not a guaranteed cycle-count reducer
+
+- build_estimate_table(...) → list[SteadyStateEstimate]
+  - Builds common residual-fraction rows for the estimator dialog
+
+app/analysis/steady_state_time_history_export.py
+
+- build_seconds_time_history_frame(one_cycle_plot_data, interval_degrees, cycles, frequency_hz) → DataFrame
+  - Repeats the selected steady-state one-cycle waveform into a seconds-based transient load history with an inclusive endpoint
+
+- apply_half_cosine_soft_start(frame, ramp_cycles, frequency_hz, time_column="Time") → DataFrame
+  - Applies m(t) = 0.5 * (1 - cos(pi * t / T_ramp)) for 0 <= t < T_ramp, then 1.0
+  - Multiplies load/data columns only and never the time column
+  - Runs before unit conversion and CSV header generation in the export dialog
+  - Prevents a steady-state waveform from being introduced as an artificial initial load step when the downstream transient model starts from zero state
+  - Uses a one-sided half-cosine ramp instead of the existing full Tukey window because this export needs to end at full steady-state amplitude; the Tukey window remains the two-sided taper for extracted TIME sections and signal-processing boundary control
+
+- convert_time_history_frame_for_export(...) → DataFrame
+  - Converts non-time columns to the selected export units where unit context is known
+
+- build_time_history_csv_headers(...) → list[str]
+  - Adds selected unit labels to CSV headers without adding metadata rows
+
+References used by this implementation: ANSYS Help: Harmonic Response; ANSYS Help: Mode-Superposition Transient Dynamic Analysis; SciPy Documentation: scipy.signal.windows.tukey.
+
 app/analysis/ansys_exporter.py
 
 - AnsysExporter

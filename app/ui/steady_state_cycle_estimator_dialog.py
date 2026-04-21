@@ -146,6 +146,12 @@ th {
 
 <p>At exact resonance, the cycle count therefore depends mainly on damping. The selected frequency changes the required <b>time</b>, not much the required <b>cycle count</b>.</p>
 
+<p>In shorthand form at exact resonance:</p>
+<div class="eq">
+  N = ln(1 / r) / (2*pi*zeta)
+</div>
+<p>Example: for <code>zeta = 0.02</code> and <code>r = 0.01</code>, <code>N = 36.65</code>, so the conservative whole-cycle recommendation rounds up to <code>37</code> cycles.</p>
+
 <h2>Practical Reference Values at Exact Resonance</h2>
 <ul>
   <li>5% residual transient: <code>N &asymp; 0.477 / &zeta;</code></li>
@@ -174,10 +180,24 @@ th {
   <li><b>Transient maximum over all time</b>: can be slightly lower or higher before settling</li>
 </ul>
 
+<h2>Soft-Start Smoothing for Exported Loads</h2>
+<p>The steady-state time-history export repeats the harmonic steady-state cycle as a transient load history. If the downstream transient model starts from zero displacement, velocity, and applied load state, a first sample that is already at steady-state amplitude can look like an artificial initial load step. That step can excite numerical or physical startup content that is separate from the intended sinusoidal forcing.</p>
+
+<p>The export dialog can therefore multiply load/data columns by a one-sided half-cosine ramp:</p>
+<div class="eq small-eq">
+  m(t) = 0.5 [1 - cos(pi t / T<sub>ramp</sub>)] for 0 &le; t &lt; T<sub>ramp</sub>, then m(t) = 1
+</div>
+<p>The time column is not smoothed. Smoothing runs before unit conversion and CSV header generation.</p>
+
+<p>This is intentionally different from the existing full Tukey window. A Tukey window is a two-sided window for tapering both boundaries of an extracted time section, which is useful for reducing boundary discontinuities in signal-processing workflows. A steady-state export should end at full amplitude so the final cycles remain representative of the requested sinusoidal load, so this export only ramps the beginning and then leaves the rest of the history unchanged.</p>
+
+<p>Soft-start smoothing helps load introduction and can help solver convergence, but it is not a guaranteed cycle-count reducer. The estimator's recommended cycle count remains conservative and is not auto-reduced because the relevant modal transient decay still depends on damping, frequency, model details, and solver setup.</p>
+
 <h2>References</h2>
 <ol>
   <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v242/en/wb2_help/wb2h_harmrespAN.html">ANSYS Help: Harmonic Response</a></li>
   <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_str/Hlp_G_STR5_10.html">ANSYS Help: Mode-Superposition Transient Dynamic Analysis</a></li>
+  <li><a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.tukey.html">SciPy Documentation: scipy.signal.windows.tukey</a></li>
   <li><a href="https://eng.libretexts.org/Bookshelves/Mechanical_Engineering/Introductory_Dynamics%3A_2D_Kinematics_and_Kinetics_of_Point_Masses_and_Rigid_Bodies_%28Steeneken%29/04%3A_Vibrations_and_Strategy/13%3A_Vibrations/13.04%3A_Forced_vibrations">Engineering LibreTexts: Forced Vibrations</a></li>
   <li><a href="https://ocw.mit.edu/courses/8-03sc-physics-iii-vibrations-and-waves-fall-2016/782069da3820fc514c10c26ae0c15b01_MIT8_03SCF16_Text_Ch2.pdf">MIT OpenCourseWare: Forced Oscillation and Resonance</a></li>
 </ol>

@@ -38,6 +38,9 @@ Time Domain Representation Tab (FREQ domain only)
 - Frequency selector populated with unique FREQ values
 - Interval selector with divisors of 360 for sampling (1..360)
 - Extract Data button emits extract_data_requested; ActionHandler exports sampled CSV
+- Estimate Cycles to Steady State opens a helper dialog for damping/residual inputs and stores the latest conservative whole-cycle estimate for the export dialog
+- Export Steady-State Time History as CSV opens a preview/export dialog with whole-cycle entry, export unit selectors, and Soft Start controls
+- Soft Start is enabled by default and applies a one-sided half-cosine ramp to load/data columns only, not the time column. This smooths load introduction when a transient model starts from zero state, but it does not guarantee fewer cycles are needed.
 - Plot reconstructs y(θ) = A cos(θ − φ) for each selected side component
 
 Compare Data Tab

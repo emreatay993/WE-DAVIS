@@ -65,12 +65,9 @@ Applies current Section Data and Tukey Window settings if enabled.</i>
 """
 
 STEADY_STATE_CYCLE_ESTIMATOR = """
-<b>Estimate how many transient cycles are needed to reach steady state.</b><br><br>
-Uses the classical startup-transient decay envelope for a damped modal response.<br><br>
-<b>Estimator basis:</b><br>
-&#8226; t = ln(1 / r) / (zeta * omega_n)<br>
-&#8226; N = f_exc * t<br><br>
-At exact resonance, the required cycle count depends mainly on damping, while the
-frequency changes the required run time.<br><br>
-<i>Opens a helper dialog with inputs, formulas, caveats, and references.</i>
+<b>Estimate transient cycles to reach steady state.</b><br><br>
+Uses damped modal decay to recommend a conservative whole-cycle count.
+Steady-state CSV export can add a short soft start, but that does not
+automatically reduce this estimate.<br><br>
+<i>Open the helper dialog for formulas, caveats, and references.</i>
 """

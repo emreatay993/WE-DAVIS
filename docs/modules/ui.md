@@ -61,11 +61,28 @@ tab_compare_part_loads.py
 tab_time_domain_represent.py
 
 TimeDomainRepresentTab (QWidget)
-  - Signals: plot_parameters_changed, extract_data_requested
-  - Widgets: frequency selector; interval selector (divisors of 360); plot; extract button
+  - Signals: plot_parameters_changed, extract_data_requested, steady_state_time_history_export_requested, steady_state_estimator_requested
+  - Widgets: frequency selector; interval selector (divisors of 360); plot; extract button; steady-state time-history export button; steady-state cycle estimator button
   - Methods: display_plot(fig)
   - State: current_plot_data dict populated by PlotController for extraction
   - Behavior: user-facing behavior is unchanged; when the Part Loads side_filter_selector has multiple sides checked, the snapshot taken for this tab uses the first selected side
+  - The estimator button opens SteadyStateCycleEstimatorDialog and stores the latest conservative whole-cycle estimate; the export button opens SteadyStateTimeHistoryExportDialog with the current one-cycle waveform, selected interval, selected frequency, and latest estimator snapshot
+
+steady_state_cycle_estimator_dialog.py
+
+- SteadyStateCycleEstimatorDialog(QDialog)
+  - Inputs: damping ratio, excitation frequency, optional separate dominant mode frequency, residual transient percentage
+  - Help tab documents the damped modal decay basis, exact-resonance shorthand N = ln(1 / r) / (2*pi*zeta), and the example zeta = 0.02, r = 0.01 -> 36.65 -> 37 cycles
+  - Also explains the steady-state export soft-start rationale and references ANSYS Help: Harmonic Response, ANSYS Help: Mode-Superposition Transient Dynamic Analysis, and SciPy Documentation: scipy.signal.windows.tukey
+
+steady_state_time_history_export_dialog.py
+
+- SteadyStateTimeHistoryExportDialog(QDialog)
+  - Inputs: whole cycles, Soft Start toggle, ramp cycles, export unit selectors, and optional unknown-unit labels
+  - Soft Start defaults on with a 2.0-cycle one-sided half-cosine ramp and 0.5-cycle control steps
+  - The ramp is applied only to load/data columns before unit conversion and CSV header generation; the time column remains unchanged
+  - Rationale: a repeated steady-state cycle can create an artificial initial step when the downstream transient model starts from zero state; the one-sided ramp introduces loads smoothly while preserving full-amplitude final cycles
+  - Caveat: smoothing helps load introduction/convergence but is not a guaranteed cycle-count reducer, and it does not change the estimator recommendation
 
 tab_settings.py
 
