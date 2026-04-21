@@ -29,7 +29,7 @@ Added dialog-level tests for enabled smoothing, disabled smoothing with an overs
   - Ran 13 tests.
   - Result: OK.
 
-- Final Verification Verdict: PASS with baseline repository-wide discovery blocker carried forward.
+- Final Verification Verdict: PASS
 
 ## Manual Test Directives
 
