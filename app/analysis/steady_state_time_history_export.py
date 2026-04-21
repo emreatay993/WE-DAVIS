@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Mapping
 
 import pandas as pd
@@ -72,6 +73,51 @@ def build_seconds_time_history_frame(
         ]
 
     return pd.DataFrame(export_columns)
+
+
+def apply_half_cosine_soft_start(
+    frame: pd.DataFrame,
+    ramp_cycles: float,
+    frequency_hz: float,
+    time_column: str = "Time",
+) -> pd.DataFrame:
+    if ramp_cycles < 0.0:
+        raise ValueError("Ramp cycles must be non-negative.")
+    if frequency_hz <= 0.0:
+        raise ValueError("Frequency in Hz must be positive.")
+
+    smoothed = frame.copy(deep=True)
+    if ramp_cycles == 0.0:
+        return smoothed
+
+    if time_column not in smoothed.columns:
+        raise ValueError(f"Time column '{time_column}' is missing.")
+    if smoothed.empty:
+        raise ValueError("Cannot apply soft start to an empty time-history frame.")
+
+    final_time_s = float(smoothed[time_column].iloc[-1])
+    total_exported_cycles = final_time_s * frequency_hz
+    if ramp_cycles - total_exported_cycles > 1.0e-12:
+        raise ValueError(
+            "Ramp cycles must not exceed total exported cycles "
+            f"({ramp_cycles:g} > {total_exported_cycles:g})."
+        )
+
+    ramp_duration_s = ramp_cycles / frequency_hz
+    multipliers = smoothed[time_column].map(
+        lambda time_s: (
+            0.5 * (1.0 - math.cos(math.pi * float(time_s) / ramp_duration_s))
+            if float(time_s) < ramp_duration_s
+            else 1.0
+        )
+    )
+
+    for column_name in smoothed.columns:
+        if column_name == time_column:
+            continue
+        smoothed[column_name] = smoothed[column_name] * multipliers
+
+    return smoothed
 
 
 def convert_time_history_frame_for_export(
