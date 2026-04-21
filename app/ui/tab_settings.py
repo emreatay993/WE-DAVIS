@@ -83,9 +83,22 @@ class SettingsTab(QtWidgets.QWidget):
         self.display_unit_rows_layout.addWidget(self.display_unit_placeholder_label)
         units_layout.addLayout(self.display_unit_rows_layout)
 
+        self.export_unit_notice_label = QLabel(
+            "CSV unit behavior: Full Data CSV uses the current display units. "
+            "Extracted time-history and ANSYS CSV exports use the Export Units mode below. "
+            "Source Units keeps detected file units; Display Units converts to the selected display units. "
+            "Steady-state time-history export has its own unit selectors in that dialog."
+        )
+        self.export_unit_notice_label.setWordWrap(True)
+        units_layout.addWidget(self.export_unit_notice_label)
+
         self.export_unit_selector = self._create_selector(
             [self.EXPORT_SOURCE_UNITS, self.EXPORT_DISPLAY_UNITS],
             self.EXPORT_SOURCE_UNITS,
+        )
+        self.export_unit_selector.setToolTip(
+            "Choose Source Units for detected file units or Display Units for the units selected above. "
+            "This applies to extracted time-history and ANSYS CSV exports."
         )
         units_layout.addWidget(self._create_setting_row_widget("Export Units", self.export_unit_selector))
         self.units_group.setLayout(units_layout)

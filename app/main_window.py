@@ -474,6 +474,11 @@ class MainWindow(QMainWindow):
         try:
             # Include DataFolder to preserve grouping; export current combined df
             self.df.to_csv(file_path, index=False)
-            QMessageBox.information(self, "Success", f"Data exported to {os.path.basename(file_path)}")
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Data exported to {os.path.basename(file_path)}\n\n"
+                "Full Data CSV uses the currently selected display units.",
+            )
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to export CSV: {e}")

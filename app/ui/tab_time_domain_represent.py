@@ -36,6 +36,7 @@ class TimeDomainRepresentTab(QtWidgets.QWidget):
                 self.interval_selector.addItem(str(i))
 
         self.extract_button = QPushButton("Extract Data at Each Interval as CSV file")
+        self.extract_button.setToolTip(tooltips.EXTRACT_TIME_DOMAIN_INTERVAL_CSV)
         self.steady_state_time_history_export_button = QPushButton("Export Steady-State Time History as CSV file")
         self.steady_state_estimator_button = QPushButton("Estimate Cycles to Steady State")
         self.steady_state_estimator_button.setToolTip(tooltips.STEADY_STATE_CYCLE_ESTIMATOR)

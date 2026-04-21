@@ -537,14 +537,55 @@ class ExportUnitModeTests(unittest.TestCase):
 
         with patch.object(QFileDialog, "getSaveFileName", return_value=("time_export.csv", "CSV Files (*.csv)")), \
                 patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv), \
-                patch.object(QMessageBox, "information", return_value=None), \
+                patch.object(QMessageBox, "information", return_value=None) as information_box, \
                 patch("app.controllers.action_handler.os.startfile", return_value=None):
             handler.handle_time_domain_represent_export()
 
         self.assertIn("time_export.csv", captured_exports)
         exported_frame = captured_exports["time_export.csv"]
-        self.assertEqual(exported_frame["Theta"].tolist(), [0.0, 180.0, 360.0])
-        self.assertEqual(exported_frame["Force_A"].tolist(), [0.0, 180.0, 360.0])
+        self.assertEqual(exported_frame.columns.tolist(), ["Theta [deg]", "Force_A [kN]"])
+        self.assertEqual(exported_frame["Theta [deg]"].tolist(), [0.0, 180.0, 360.0])
+        self.assertEqual(exported_frame["Force_A [kN]"].tolist(), [0.0, 180.0, 360.0])
+        self.assertIn("Settings > Export Units: Source Units mode", information_box.call_args.args[2])
+
+    def test_time_domain_export_labels_display_units_in_csv_headers(self) -> None:
+        df = pd.DataFrame({"FREQ": [1000.0]})
+        raw_unit_context = {
+            "Force_A": ColumnUnitContext.from_source_unit("Force_A", "kN"),
+        }
+        handler, main_window = self._build_handler(
+            df,
+            raw_unit_context,
+            data_domain="FREQ",
+            export_mode=SettingsTab.EXPORT_DISPLAY_UNITS,
+            display_units={"force": "N", "phase": "rad"},
+        )
+        theta_radians = [math.radians(value) for value in range(361)]
+        force_display_values = [float(value * 1000) for value in range(361)]
+        main_window.tab_time_domain_represent.current_plot_data = {
+            "Force_A": {
+                "theta": theta_radians,
+                "y_data": force_display_values,
+            }
+        }
+
+        captured_exports = {}
+
+        def _capture_to_csv(frame, path, *args, **kwargs):
+            captured_exports[path] = frame.copy(deep=True)
+            return None
+
+        with patch.object(QFileDialog, "getSaveFileName", return_value=("time_export.csv", "CSV Files (*.csv)")), \
+                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv), \
+                patch.object(QMessageBox, "information", return_value=None) as information_box, \
+                patch("app.controllers.action_handler.os.startfile", return_value=None):
+            handler.handle_time_domain_represent_export()
+
+        exported_frame = captured_exports["time_export.csv"]
+        self.assertEqual(exported_frame.columns.tolist(), ["Theta [rad]", "Force_A [N]"])
+        self.assertAlmostEqual(exported_frame["Theta [rad]"].iloc[1], math.pi, places=6)
+        self.assertEqual(exported_frame["Force_A [N]"].tolist(), [0.0, 180000.0, 360000.0])
+        self.assertIn("Settings > Export Units: Display Units mode", information_box.call_args.args[2])
 
     def test_ansys_export_rejects_unsupported_quantity_family_before_template_creation(self) -> None:
         df = pd.DataFrame(

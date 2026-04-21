@@ -38,6 +38,7 @@ def _install_dialog_dependency_stubs() -> None:
             self.textChanged = _Signal()
             self.toggled = _Signal()
             self.valueChanged = _Signal()
+            self.activated = _Signal()
 
         def __getattr__(self, name):
             def _method(*args, **kwargs):
@@ -57,9 +58,13 @@ def _install_dialog_dependency_stubs() -> None:
 
     class _QtNamespace:
         NoContextMenu = 0
+        WindowMinimizeButtonHint = 1
+        WindowMaximizeButtonHint = 2
+        WidgetWithChildrenShortcut = 3
 
     qtcore_module.Qt = getattr(qtcore_module, "Qt", _QtNamespace)
     qtgui_module.QIntValidator = getattr(qtgui_module, "QIntValidator", _Widget)
+    qtgui_module.QKeySequence = getattr(qtgui_module, "QKeySequence", _Widget)
 
     for class_name in (
         "QCheckBox",
@@ -72,6 +77,7 @@ def _install_dialog_dependency_stubs() -> None:
         "QLineEdit",
         "QMessageBox",
         "QPushButton",
+        "QShortcut",
     ):
         setattr(qtwidgets_module, class_name, getattr(qtwidgets_module, class_name, _Widget))
     for class_name in ("QFormLayout", "QGridLayout", "QHBoxLayout", "QVBoxLayout"):
@@ -166,6 +172,33 @@ class _Plotter:
         return None
 
 
+class _ShortcutPlotter(_Plotter):
+    def __init__(self) -> None:
+        self.cycle_count = 0
+        self.toggle_count = 0
+
+    def cycle_legend_position(self) -> None:
+        self.cycle_count += 1
+
+    def toggle_legend_visibility(self) -> None:
+        self.toggle_count += 1
+
+
+class _WindowControlProbe:
+    def __init__(self) -> None:
+        self._flags = 4
+        self.size_grip_enabled = None
+
+    def windowFlags(self):
+        return self._flags
+
+    def setWindowFlags(self, flags) -> None:
+        self._flags = flags
+
+    def setSizeGripEnabled(self, enabled: bool) -> None:
+        self.size_grip_enabled = enabled
+
+
 class SteadyStateTimeHistoryExportTests(unittest.TestCase):
     def _build_dialog_proxy(
         self,
@@ -208,6 +241,28 @@ class SteadyStateTimeHistoryExportTests(unittest.TestCase):
         dialog.export_button = _Button()
         dialog.preview_plot = object()
         dialog._plotter = _Plotter()
+
+    def test_dialog_enables_fullscreen_window_controls(self):
+        probe = _WindowControlProbe()
+
+        SteadyStateTimeHistoryExportDialog._enable_fullscreen_window_controls(probe)
+
+        self.assertTrue(probe._flags & 1)
+        self.assertTrue(probe._flags & 2)
+        self.assertTrue(probe.size_grip_enabled)
+
+    def test_dialog_preview_shortcuts_reuse_plotter_legend_actions(self):
+        dialog = self._build_dialog_proxy()
+        dialog._plotter = _ShortcutPlotter()
+        refresh_calls = []
+        dialog._refresh_preview = lambda: refresh_calls.append("refresh")
+
+        dialog._cycle_preview_legend_position()
+        dialog._toggle_preview_legend_visibility()
+
+        self.assertEqual(dialog._plotter.cycle_count, 1)
+        self.assertEqual(dialog._plotter.toggle_count, 1)
+        self.assertEqual(refresh_calls, ["refresh", "refresh"])
 
     def test_build_seconds_time_history_frame_uses_cycles_interval_and_inclusive_endpoint(self):
         one_cycle_plot_data = {

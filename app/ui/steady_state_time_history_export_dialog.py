@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QShortcut,
     QVBoxLayout,
 )
 
@@ -69,6 +70,7 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
 
     def _setup_ui(self):
         self.setWindowTitle("Steady-State Time-History Export")
+        self._enable_fullscreen_window_controls()
         self.resize(1080, 840)
 
         summary_group = QGroupBox("Export Summary")
@@ -177,7 +179,43 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
         self.ramp_cycles_spin.valueChanged.connect(self._refresh_preview)
         self.export_button.clicked.connect(self._handle_export)
         self.close_button.clicked.connect(self.reject)
+        self._setup_plot_shortcuts()
         self._update_cycle_source_note()
+
+    def _enable_fullscreen_window_controls(self):
+        self.setWindowFlags(
+            self.windowFlags()
+            | QtCore.Qt.WindowMinimizeButtonHint
+            | QtCore.Qt.WindowMaximizeButtonHint
+        )
+        self.setSizeGripEnabled(True)
+
+    def _setup_plot_shortcuts(self):
+        self.legend_position_shortcut = QShortcut(
+            QtGui.QKeySequence("K"),
+            self.preview_plot,
+        )
+        self.legend_position_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+        self.legend_position_shortcut.activated.connect(
+            self._cycle_preview_legend_position
+        )
+
+        self.legend_visibility_shortcut = QShortcut(
+            QtGui.QKeySequence("L"),
+            self.preview_plot,
+        )
+        self.legend_visibility_shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+        self.legend_visibility_shortcut.activated.connect(
+            self._toggle_preview_legend_visibility
+        )
+
+    def _cycle_preview_legend_position(self):
+        self._plotter.cycle_legend_position()
+        self._refresh_preview()
+
+    def _toggle_preview_legend_visibility(self):
+        self._plotter.toggle_legend_visibility()
+        self._refresh_preview()
 
     def _populate_family_controls(self):
         row = 0

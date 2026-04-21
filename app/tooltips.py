@@ -64,6 +64,14 @@ which one to use. If a version fails, try selecting a different version.<br><br>
 Applies current Section Data and Tukey Window settings if enabled.</i>
 """
 
+EXTRACT_TIME_DOMAIN_INTERVAL_CSV = """
+<b>Export sampled time-domain plot data as CSV.</b><br><br>
+This export follows the Settings tab's <b>Export Units</b> mode:<br>
+&#8226; <b>Source Units:</b> convert plotted values back to the detected file units<br>
+&#8226; <b>Display Units:</b> export values in the currently selected display units<br><br>
+The chosen mode is also shown in the export confirmation message.
+"""
+
 STEADY_STATE_CYCLE_ESTIMATOR = """
 <b>Estimate transient cycles to reach steady state.</b><br><br>
 Uses damped modal decay to recommend a conservative whole-cycle count.

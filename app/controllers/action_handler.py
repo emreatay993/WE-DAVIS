@@ -118,6 +118,17 @@ class ActionHandler(QtCore.QObject):
             family_hint=context.quantity_family,
         )
 
+    def _get_export_unit_label(self, context):
+        if context is None:
+            return None
+        if self._get_export_mode() == SettingsTab.EXPORT_DISPLAY_UNITS:
+            return context.display_unit or context.normalized_unit
+        return context.normalized_unit or context.display_unit
+
+    def _format_export_column_label(self, column_name, context):
+        unit = self._get_export_unit_label(context)
+        return f"{column_name} [{unit}]" if unit else column_name
+
     def _validate_ansys_export_units(self, export_frame, export_context_map):
         if export_frame is None or export_frame.empty:
             return None, "ANSYS export requires at least one selected data column."
@@ -462,14 +473,14 @@ class ActionHandler(QtCore.QObject):
             theta_values = pd.Series(first_plot_data["theta"], copy=True).iloc[sample_indices].reset_index(drop=True)
             theta_context = self._build_theta_display_context()
             exported_theta = self._convert_display_series_to_export_mode(theta_values, theta_context)
-            data_dict = {'Theta': exported_theta.tolist()}
+            data_dict = {self._format_export_column_label('Theta', theta_context): exported_theta.tolist()}
             display_context_map = self._get_display_context_map()
 
             for col, plot_data in tab.current_plot_data.items():
                 full_y_data = pd.Series(plot_data['y_data'], copy=True).iloc[sample_indices].reset_index(drop=True)
                 column_context = display_context_map.get(col)
                 exported_y_data = self._convert_display_series_to_export_mode(full_y_data, column_context)
-                data_dict[col] = exported_y_data.tolist()
+                data_dict[self._format_export_column_label(col, column_context)] = exported_y_data.tolist()
 
             df_to_export = pd.DataFrame(data_dict)
 
@@ -485,7 +496,8 @@ class ActionHandler(QtCore.QObject):
                 QMessageBox.information(
                     self.main_window,
                     "Export Successful",
-                    f"Data successfully saved in {self._get_export_mode_label()} mode to:\n{save_path}",
+                    "Data successfully saved using Settings > Export Units: "
+                    f"{self._get_export_mode_label()} mode to:\n{save_path}",
                 )
                 os.startfile(os.path.dirname(save_path))
 

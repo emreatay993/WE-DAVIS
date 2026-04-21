@@ -493,6 +493,9 @@ class SettingsTabUnitControlsTests(unittest.TestCase):
         self.assertEqual(tab.export_unit_selector.itemText(1), SettingsTab.EXPORT_DISPLAY_UNITS)
         self.assertEqual(tab.export_unit_selector.currentText(), SettingsTab.EXPORT_DISPLAY_UNITS)
         self.assertEqual(tab.unit_summary_label.text(), summary_text)
+        self.assertIn("Full Data CSV uses the current display units", tab.export_unit_notice_label.text())
+        self.assertIn("Source Units keeps detected file units", tab.export_unit_notice_label.text())
+        self.assertIn("Display Units converts", tab.export_unit_notice_label.text())
         self.assertFalse(tab.display_unit_placeholder_label.isVisible())
 
     def test_unit_control_changes_emit_settings_changed(self) -> None:

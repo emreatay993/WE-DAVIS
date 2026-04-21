@@ -42,7 +42,11 @@ Domain-Specific UI Toggles
 
 Export Configuration
 
-- Export Full CSV (MainWindow): writes current combined df (including DataFolder) to user-chosen path
+- Export Full CSV (MainWindow): writes current combined df (including DataFolder) to user-chosen path using the currently selected display units
+- Settings tab Export Units selector:
+  - Source Units: extracted time-history and ANSYS CSV exports keep detected file units
+  - Display Units: extracted time-history and ANSYS CSV exports convert to the selected display units
+  - Steady-state time-history export uses its own unit selectors in that dialog
 - ANSYS Export (ActionHandler → AnsysExporter):
   - FREQ → create_harmonic_template: uses magnitudes and Phase_ columns; scales to kN / kN·m; generates APDL tables
   - TIME → create_transient_template: partitions large tables; sets analysis settings from inferred sample rate
