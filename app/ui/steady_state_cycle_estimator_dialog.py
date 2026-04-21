@@ -197,7 +197,12 @@ th {
 <ol>
   <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v242/en/wb2_help/wb2h_harmrespAN.html">ANSYS Help: Harmonic Response</a></li>
   <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_str/Hlp_G_STR5_10.html">ANSYS Help: Mode-Superposition Transient Dynamic Analysis</a></li>
-  <li><a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.tukey.html">SciPy Documentation: scipy.signal.windows.tukey</a></li>
+  <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/pdf/ANSYS_Mechanical_APDL_Basic_Analysis_Guide.pdf">ANSYS Mechanical APDL Basic Analysis Guide, Release 2025 R2, Chapter 3 Loading, Section 3.4 Ramped and Stepped Loads, PDF p. 26</a></li>
+  <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/pdf/ANSYS_Mechanical_APDL_Structural_Analysis_Guide.pdf">ANSYS Mechanical APDL Structural Analysis Guide, Release 2025 R2, Chapter 5 Transient Dynamic Analysis, Section 5.3.2 Establish Initial Conditions, PDF p. 156</a></li>
+  <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_thry/thy_anproc2.html">ANSYS Mechanical APDL Theory Reference, Release 2025 R2, Chapter 15.2 Transient Analysis</a></li>
+  <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v251/en/wb_sim/ds_transient_mechanical_analysis_type.html">ANSYS Mechanical User's Guide, Release 2025 R1, Section 5.12 Transient Structural Analysis</a></li>
+  <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_mul/Hlp_G_MULINITCOND.html">ANSYS Multibody Analysis Guide, Release 2025 R2, Chapter 3.3 Initial Conditions</a></li>
+  <li><a href="https://docs.scipy.org/doc/scipy-1.14.1/reference/generated/scipy.signal.windows.tukey.html">SciPy v1.14.1 scipy.signal.windows.tukey reference, citing Harris 1978 for tapered-cosine window background</a></li>
   <li><a href="https://eng.libretexts.org/Bookshelves/Mechanical_Engineering/Introductory_Dynamics%3A_2D_Kinematics_and_Kinetics_of_Point_Masses_and_Rigid_Bodies_%28Steeneken%29/04%3A_Vibrations_and_Strategy/13%3A_Vibrations/13.04%3A_Forced_vibrations">Engineering LibreTexts: Forced Vibrations</a></li>
   <li><a href="https://ocw.mit.edu/courses/8-03sc-physics-iii-vibrations-and-waves-fall-2016/782069da3820fc514c10c26ae0c15b01_MIT8_03SCF16_Text_Ch2.pdf">MIT OpenCourseWare: Forced Oscillation and Resonance</a></li>
 </ol>

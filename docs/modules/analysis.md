@@ -62,7 +62,16 @@ app/analysis/steady_state_time_history_export.py
 - build_time_history_csv_headers(...) → list[str]
   - Adds selected unit labels to CSV headers without adding metadata rows
 
-References used by this implementation: ANSYS Help: Harmonic Response; ANSYS Help: Mode-Superposition Transient Dynamic Analysis; SciPy Documentation: scipy.signal.windows.tukey.
+References used by this implementation:
+
+- ANSYS Help: Harmonic Response.
+- ANSYS Help: Mode-Superposition Transient Dynamic Analysis.
+- [ANSYS Mechanical APDL Basic Analysis Guide, Release 2025 R2, Chapter 3 Loading, Section 3.4 Ramped and Stepped Loads, PDF p. 26](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/pdf/ANSYS_Mechanical_APDL_Basic_Analysis_Guide.pdf).
+- [ANSYS Mechanical APDL Structural Analysis Guide, Release 2025 R2, Chapter 5 Transient Dynamic Analysis, Section 5.3.2 Establish Initial Conditions, PDF p. 156](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/pdf/ANSYS_Mechanical_APDL_Structural_Analysis_Guide.pdf).
+- [ANSYS Mechanical APDL Theory Reference, Release 2025 R2, Chapter 15.2 Transient Analysis](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_thry/thy_anproc2.html).
+- [ANSYS Mechanical User's Guide, Release 2025 R1, Section 5.12 Transient Structural Analysis](https://ansyshelp.ansys.com/public/Views/Secured/corp/v251/en/wb_sim/ds_transient_mechanical_analysis_type.html).
+- [ANSYS Multibody Analysis Guide, Release 2025 R2, Chapter 3.3 Initial Conditions](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_mul/Hlp_G_MULINITCOND.html).
+- [SciPy v1.14.1 scipy.signal.windows.tukey reference, citing Harris 1978 for tapered-cosine window background](https://docs.scipy.org/doc/scipy-1.14.1/reference/generated/scipy.signal.windows.tukey.html).
 
 app/analysis/ansys_exporter.py
 
