@@ -27,7 +27,7 @@ Added focused unit coverage for zero-ramp no-op copy behavior, first-row zeroing
   - Ran 8 tests.
   - Result: OK.
 
-Final Verification Verdict: PASS
+- Final Verification Verdict: PASS
 
 ## Manual Test Directives
 
