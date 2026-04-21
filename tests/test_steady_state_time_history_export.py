@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+import sys
+from types import ModuleType
 import unittest
 
 import pandas as pd
@@ -14,7 +17,198 @@ from app.analysis.steady_state_time_history_export import (
 from app.units import ColumnUnitContext
 
 
+def _install_dialog_dependency_stubs() -> None:
+    pyqt5_module = sys.modules.get("PyQt5", ModuleType("PyQt5"))
+    qtcore_module = sys.modules.get("PyQt5.QtCore", ModuleType("PyQt5.QtCore"))
+    qtgui_module = sys.modules.get("PyQt5.QtGui", ModuleType("PyQt5.QtGui"))
+    qtwebengine_module = sys.modules.get(
+        "PyQt5.QtWebEngineWidgets",
+        ModuleType("PyQt5.QtWebEngineWidgets"),
+    )
+    qtwidgets_module = sys.modules.get("PyQt5.QtWidgets", ModuleType("PyQt5.QtWidgets"))
+
+    class _Signal:
+        def connect(self, *args, **kwargs) -> None:
+            return None
+
+    class _Widget:
+        def __init__(self, *args, **kwargs) -> None:
+            self.clicked = _Signal()
+            self.currentIndexChanged = _Signal()
+            self.textChanged = _Signal()
+            self.toggled = _Signal()
+            self.valueChanged = _Signal()
+
+        def __getattr__(self, name):
+            def _method(*args, **kwargs):
+                return None
+
+            return _method
+
+    class _Layout(_Widget):
+        def addRow(self, *args, **kwargs) -> None:
+            return None
+
+        def addWidget(self, *args, **kwargs) -> None:
+            return None
+
+        def addLayout(self, *args, **kwargs) -> None:
+            return None
+
+    class _QtNamespace:
+        NoContextMenu = 0
+
+    qtcore_module.Qt = getattr(qtcore_module, "Qt", _QtNamespace)
+    qtgui_module.QIntValidator = getattr(qtgui_module, "QIntValidator", _Widget)
+
+    for class_name in (
+        "QCheckBox",
+        "QComboBox",
+        "QDialog",
+        "QDoubleSpinBox",
+        "QFileDialog",
+        "QGroupBox",
+        "QLabel",
+        "QLineEdit",
+        "QMessageBox",
+        "QPushButton",
+    ):
+        setattr(qtwidgets_module, class_name, getattr(qtwidgets_module, class_name, _Widget))
+    for class_name in ("QFormLayout", "QGridLayout", "QHBoxLayout", "QVBoxLayout"):
+        setattr(qtwidgets_module, class_name, getattr(qtwidgets_module, class_name, _Layout))
+    qtwebengine_module.QWebEngineView = getattr(qtwebengine_module, "QWebEngineView", _Widget)
+
+    pyqt5_module.QtCore = qtcore_module
+    pyqt5_module.QtGui = qtgui_module
+    pyqt5_module.QtWebEngineWidgets = qtwebengine_module
+    pyqt5_module.QtWidgets = qtwidgets_module
+
+    sys.modules["PyQt5"] = pyqt5_module
+    sys.modules["PyQt5.QtCore"] = qtcore_module
+    sys.modules["PyQt5.QtGui"] = qtgui_module
+    sys.modules["PyQt5.QtWebEngineWidgets"] = qtwebengine_module
+    sys.modules["PyQt5.QtWidgets"] = qtwidgets_module
+
+    plotter_module = sys.modules.get(
+        "app.plotting.plotter",
+        ModuleType("app.plotting.plotter"),
+    )
+    plotter_module.Plotter = getattr(plotter_module, "Plotter", type("Plotter", (), {}))
+    plotter_module.load_fig_to_webview = getattr(
+        plotter_module,
+        "load_fig_to_webview",
+        lambda *args, **kwargs: None,
+    )
+    sys.modules["app.plotting.plotter"] = plotter_module
+
+
+_install_dialog_dependency_stubs()
+
+from app.ui.steady_state_time_history_export_dialog import SteadyStateTimeHistoryExportDialog
+
+
+class _TextInput:
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    def text(self) -> str:
+        return self._text
+
+
+class _Selector:
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    def currentText(self) -> str:
+        return self._text
+
+
+class _CheckedOption:
+    def __init__(self, checked: bool) -> None:
+        self._checked = checked
+
+    def isChecked(self) -> bool:
+        return self._checked
+
+
+class _ValueControl:
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def value(self) -> float:
+        return self._value
+
+
+class _Label:
+    def __init__(self) -> None:
+        self._text = ""
+
+    def setText(self, text: str) -> None:
+        self._text = text
+
+    def text(self) -> str:
+        return self._text
+
+
+class _Button:
+    def __init__(self) -> None:
+        self._enabled = True
+
+    def setEnabled(self, enabled: bool) -> None:
+        self._enabled = enabled
+
+    def isEnabled(self) -> bool:
+        return self._enabled
+
+
+class _Plotter:
+    def create_standard_figure(self, *args, **kwargs):
+        return None
+
+
 class SteadyStateTimeHistoryExportTests(unittest.TestCase):
+    def _build_dialog_proxy(
+        self,
+        *,
+        cycles: int = 2,
+        frequency_hz: float = 1.0,
+        soft_start_enabled: bool = True,
+        ramp_cycles: float = 1.0,
+    ):
+        dialog = SteadyStateTimeHistoryExportDialog.__new__(SteadyStateTimeHistoryExportDialog)
+        dialog._current_plot_data = OrderedDict(
+            {
+                "Force_A": {
+                    "y_data": [10.0] * 360,
+                }
+            }
+        )
+        dialog._interval_degrees = 90
+        dialog._selected_frequency_value = frequency_hz
+        dialog._selected_frequency_context = None
+        dialog._trace_contexts = OrderedDict(
+            {
+                "Force_A": ColumnUnitContext.from_source_unit("Force_A", "N"),
+            }
+        )
+        dialog._family_selectors = OrderedDict(
+            {
+                "time": _Selector("s"),
+                "force": _Selector("N"),
+            }
+        )
+        dialog._unknown_label_inputs = OrderedDict()
+        dialog.cycles_input = _TextInput(str(cycles))
+        dialog.soft_start_checkbox = _CheckedOption(soft_start_enabled)
+        dialog.ramp_cycles_spin = _ValueControl(ramp_cycles)
+        return dialog
+
+    def _attach_preview_fakes(self, dialog) -> None:
+        dialog.preview_status_label = _Label()
+        dialog.export_button = _Button()
+        dialog.preview_plot = object()
+        dialog._plotter = _Plotter()
+
     def test_build_seconds_time_history_frame_uses_cycles_interval_and_inclusive_endpoint(self):
         one_cycle_plot_data = {
             "Force_A": {
@@ -117,6 +311,76 @@ class SteadyStateTimeHistoryExportTests(unittest.TestCase):
         self.assertAlmostEqual(converted["Force_A"].iloc[2], 1.0, places=12)
         self.assertAlmostEqual(converted["Force_A"].iloc[3], 1.0, places=12)
         self.assertEqual(headers, ["Time [s]", "Force_A [kN]"])
+
+    def test_dialog_preview_frame_applies_enabled_soft_start(self):
+        dialog = self._build_dialog_proxy(
+            cycles=2,
+            frequency_hz=1.0,
+            soft_start_enabled=True,
+            ramp_cycles=1.0,
+        )
+
+        frame, cycles, frequency_hz = dialog._build_preview_frame()
+
+        self.assertEqual(cycles, 2)
+        self.assertEqual(frequency_hz, 1.0)
+        self.assertEqual(frame.columns.tolist(), ["Time [s]", "Force_A [N]"])
+        self.assertAlmostEqual(frame["Force_A [N]"].iloc[0], 0.0, places=12)
+        self.assertAlmostEqual(frame["Force_A [N]"].iloc[2], 5.0, places=12)
+        self.assertAlmostEqual(frame["Force_A [N]"].iloc[4], 10.0, places=12)
+
+    def test_dialog_preview_frame_skips_disabled_soft_start_even_when_ramp_exceeds_cycles(self):
+        dialog = self._build_dialog_proxy(
+            cycles=1,
+            frequency_hz=1.0,
+            soft_start_enabled=False,
+            ramp_cycles=2.0,
+        )
+
+        frame, _, _ = dialog._build_preview_frame()
+
+        self.assertEqual(frame["Force_A [N]"].tolist(), [10.0, 10.0, 10.0, 10.0, 10.0])
+
+    def test_dialog_preview_frame_rejects_enabled_ramp_longer_than_export(self):
+        dialog = self._build_dialog_proxy(
+            cycles=1,
+            frequency_hz=1.0,
+            soft_start_enabled=True,
+            ramp_cycles=2.0,
+        )
+
+        with self.assertRaisesRegex(ValueError, "total exported cycles"):
+            dialog._build_preview_frame()
+
+    def test_dialog_preview_error_path_disables_export_for_invalid_ramp(self):
+        dialog = self._build_dialog_proxy(
+            cycles=1,
+            frequency_hz=1.0,
+            soft_start_enabled=True,
+            ramp_cycles=2.0,
+        )
+        self._attach_preview_fakes(dialog)
+
+        dialog._refresh_preview()
+
+        self.assertFalse(dialog.export_button.isEnabled())
+        self.assertIn("total exported cycles", dialog.preview_status_label.text())
+
+    def test_dialog_preview_status_includes_enabled_ramp_duration(self):
+        dialog = self._build_dialog_proxy(
+            frequency_hz=1000.0,
+            soft_start_enabled=True,
+            ramp_cycles=2.0,
+        )
+
+        status_text = dialog._build_preview_status_text(
+            row_count=9,
+            end_time=0.002,
+            cycles=2,
+            frequency_hz=1000.0,
+        )
+
+        self.assertIn("Soft start: 2 cycles / 0.002 s", status_text)
 
     def test_apply_half_cosine_soft_start_rejects_invalid_inputs(self):
         frame = pd.DataFrame(

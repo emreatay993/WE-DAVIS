@@ -6,8 +6,10 @@ import os
 
 from PyQt5 import QtCore, QtGui, QtWebEngineWidgets, QtWidgets
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGridLayout,
@@ -22,6 +24,7 @@ from PyQt5.QtWidgets import (
 
 from .. import config_manager
 from ..analysis.steady_state_time_history_export import (
+    apply_half_cosine_soft_start,
     build_seconds_time_history_frame,
     build_time_history_csv_headers,
     convert_time_history_frame_for_export,
@@ -98,6 +101,21 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
         self.estimator_summary_label.setVisible(bool(self.estimator_summary_label.text()))
         summary_layout.addRow("Estimator snapshot", self.estimator_summary_label)
 
+        soft_start_group = QGroupBox("Soft Start")
+        soft_start_group.setStyleSheet(config_manager.GROUPBOX_STYLE)
+        soft_start_layout = QFormLayout(soft_start_group)
+
+        self.soft_start_checkbox = QCheckBox("Apply smooth start")
+        self.soft_start_checkbox.setChecked(True)
+        soft_start_layout.addRow("", self.soft_start_checkbox)
+
+        self.ramp_cycles_spin = QDoubleSpinBox()
+        self.ramp_cycles_spin.setDecimals(3)
+        self.ramp_cycles_spin.setRange(0.0, 10_000_000.0)
+        self.ramp_cycles_spin.setSingleStep(0.5)
+        self.ramp_cycles_spin.setValue(2.0)
+        soft_start_layout.addRow("Ramp cycles", self.ramp_cycles_spin)
+
         units_group = QGroupBox("Export Units")
         units_group.setStyleSheet(config_manager.GROUPBOX_STYLE)
         units_layout = QVBoxLayout(units_group)
@@ -148,12 +166,15 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
 
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(summary_group)
+        main_layout.addWidget(soft_start_group)
         main_layout.addWidget(units_group)
         main_layout.addWidget(self.unknown_units_group)
         main_layout.addWidget(preview_group, stretch=1)
         main_layout.addLayout(button_row)
 
         self.cycles_input.textChanged.connect(self._on_cycles_changed)
+        self.soft_start_checkbox.toggled.connect(self._refresh_preview)
+        self.ramp_cycles_spin.valueChanged.connect(self._refresh_preview)
         self.export_button.clicked.connect(self._handle_export)
         self.close_button.clicked.connect(self.reject)
         self._update_cycle_source_note()
@@ -273,6 +294,12 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
             labels[trace_name] = label
         return labels
 
+    def _soft_start_enabled(self) -> bool:
+        return self.soft_start_checkbox.isChecked()
+
+    def _soft_start_ramp_cycles(self) -> float:
+        return float(self.ramp_cycles_spin.value())
+
     def _build_preview_frame(self):
         cycles = self._parse_cycles()
         frequency_hz = resolve_frequency_to_hz(
@@ -285,6 +312,12 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
             cycles=cycles,
             frequency_hz=frequency_hz,
         )
+        if self._soft_start_enabled():
+            base_frame = apply_half_cosine_soft_start(
+                base_frame,
+                ramp_cycles=self._soft_start_ramp_cycles(),
+                frequency_hz=frequency_hz,
+            )
         converted_frame = convert_time_history_frame_for_export(
             base_frame,
             trace_contexts=self._trace_contexts,
@@ -297,6 +330,20 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
             manual_unknown_labels=self._current_unknown_unit_labels(),
         )
         return converted_frame, cycles, frequency_hz
+
+    def _build_preview_status_text(self, row_count: int, end_time: float, cycles: int, frequency_hz: float) -> str:
+        status_text = (
+            f"{row_count} samples from 0 to {end_time:.6g} s across {cycles} cycle(s) "
+            f"at {frequency_hz:.6g} Hz."
+        )
+        if self._soft_start_enabled():
+            ramp_cycles = self._soft_start_ramp_cycles()
+            ramp_duration_s = ramp_cycles / frequency_hz
+            status_text = (
+                f"{status_text} Soft start: {ramp_cycles:g} cycles / "
+                f"{ramp_duration_s:.6g} s."
+            )
+        return status_text
 
     def _preview_y_axis_title(self, frame) -> str:
         trace_units = []
@@ -336,8 +383,7 @@ class SteadyStateTimeHistoryExportDialog(QDialog):
         row_count = len(preview_frame.index)
         end_time = preview_frame["Time [s]"].iloc[-1]
         self.preview_status_label.setText(
-            f"{row_count} samples from 0 to {end_time:.6g} s across {cycles} cycle(s) "
-            f"at {frequency_hz:.6g} Hz."
+            self._build_preview_status_text(row_count, end_time, cycles, frequency_hz)
         )
         self.export_button.setEnabled(True)
 
