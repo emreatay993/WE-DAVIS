@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import html
 import math
-import re
 import sys
 from dataclasses import dataclass
 from typing import List, Optional
@@ -28,120 +27,182 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 APP_TITLE = "Resonant MSUP Transient Cycle Estimator"
 
 
-DOCS_MD = r"""
-# Resonant MSUP transient cycle estimator
+DOCS_HTML = """
+<html>
+<head>
+<style>
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    line-height: 1.45;
+}
+h1, h2 {
+    color: #1f1f1f;
+}
+.eq {
+    margin: 10px 0 14px 0;
+    padding: 10px 14px;
+    background: #f7f7f7;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    font-family: "Cambria Math", "Times New Roman", serif;
+    font-size: 15px;
+}
+table {
+    border-collapse: collapse;
+    margin: 10px 0 14px 0;
+}
+th, td {
+    border: 1px solid #d9d9d9;
+    padding: 6px 10px;
+    text-align: left;
+}
+th {
+    background: #f2f2f2;
+}
+.defs {
+    margin: 6px 0 14px 18px;
+}
+.defs li {
+    margin: 3px 0;
+}
+</style>
+</head>
+<body>
+<h1>Resonant MSUP Transient Cycle Estimator</h1>
 
-Use this tool when the transient analysis is run at a **dominant resonant frequency** identified from a harmonic/MSUP harmonic analysis.
+<p>Use this tool when the transient analysis is run at a <b>dominant resonant frequency</b> identified from a harmonic/MSUP harmonic analysis.</p>
 
-## What changes in the resonance case?
+<h2>What Changes in the Resonance Case?</h2>
+<p>The general settling estimate is:</p>
+<div class="eq">
+  N<sub>ss</sub> = (f<sub>exc</sub> / f<sub>n</sub>) [-ln(&epsilon;)] / (2&pi;&zeta;)
+</div>
+<ul class="defs">
+  <li><i>N</i><sub>ss</sub> = forcing cycles required for the homogeneous transient to decay to the tolerance</li>
+  <li><i>f</i><sub>exc</sub> = transient excitation frequency</li>
+  <li><i>f</i><sub>n</sub> = dominant participating natural or resonant frequency</li>
+  <li>&zeta; = damping ratio</li>
+  <li>&epsilon; = acceptable remaining transient fraction</li>
+</ul>
 
-The general settling estimate is
+<p>If you run the transient <b>at the dominant resonance</b>, then:</p>
+<div class="eq">
+  f<sub>exc</sub> = f<sub>n</sub>
+</div>
 
-\[
-N_{ss}=\frac{f_{exc}}{f_n}\frac{-\ln(\varepsilon)}{2\pi\zeta}
-\]
+<p>so the estimate simplifies to:</p>
+<div class="eq">
+  N<sub>ss</sub> &asymp; [-ln(&epsilon;)] / (2&pi;&zeta;)
+</div>
+<ul class="defs">
+  <li>N<sub>ss</sub> = estimated settling cycles at resonance before any safety factor is applied</li>
+  <li>&epsilon; = acceptable remaining transient fraction</li>
+  <li>&zeta; = damping ratio</li>
+</ul>
 
-where:
+<p>The required <b>number of cycles</b> is therefore controlled mainly by damping ratio and tolerance. The resonant frequency still matters for the <b>physical time duration</b>:</p>
+<div class="eq">
+  t<sub>run</sub> = N<sub>run</sub> / f<sub>res</sub>
+</div>
+<ul class="defs">
+  <li>t<sub>run</sub> = physical transient duration in seconds</li>
+  <li>N<sub>run</sub> = total cycles you decide to run, including any safety margin and extra post-settling cycles</li>
+  <li>f<sub>res</sub> = resonant frequency in Hz used for the transient run</li>
+</ul>
 
-- \(N_{ss}\) = forcing cycles required for the homogeneous transient to decay to the tolerance,
-- \(f_{exc}\) = transient excitation frequency,
-- \(f_n\) = dominant participating natural/resonant frequency,
-- \(\zeta\) = damping ratio,
-- \(\varepsilon\) = acceptable remaining transient fraction.
+<h2>Why This Works</h2>
+<p>For a modal coordinate in an underdamped linear MSUP model:</p>
+<div class="eq">
+  q&#776; + 2&zeta;&omega;<sub>n</sub>q&#775; + &omega;<sub>n</sub><sup>2</sup>q = p(t)
+</div>
+<ul class="defs">
+  <li><i>q</i> = modal coordinate or modal response</li>
+  <li>q&#775; = first time derivative of <i>q</i></li>
+  <li>q&#776; = second time derivative of <i>q</i></li>
+  <li>&zeta; = damping ratio</li>
+  <li>&omega;<sub>n</sub> = natural circular frequency in rad/s</li>
+  <li><i>p</i>(t) = applied modal forcing as a function of time</li>
+</ul>
 
-If you run the transient **at the dominant resonance**, then
+<p>The transient response under a harmonic load can be written as:</p>
+<div class="eq">
+  q(t) = q<sub>ss</sub>(t) + q<sub>tr</sub>(t)
+</div>
+<ul class="defs">
+  <li>q<sub>ss</sub>(t) = steady-state part of the response</li>
+  <li>q<sub>tr</sub>(t) = decaying transient part of the response</li>
+</ul>
 
-\[
-f_{exc}=f_n
-\]
+<p>with the homogeneous transient envelope decaying as:</p>
+<div class="eq">
+  q<sub>tr</sub>(t) &sim; e<sup>-&zeta;&omega;<sub>n</sub>t</sup>
+</div>
+<ul class="defs">
+  <li><i>t</i> = time</li>
+  <li>&zeta;&omega;<sub>n</sub> = exponential decay rate of the modal transient envelope</li>
+</ul>
 
-so the estimate simplifies to
+<p>At resonance, one forcing period is approximately one modal period, so after <i>N</i> forcing cycles:</p>
+<div class="eq">
+  |q<sub>tr</sub>(N)| / |q<sub>tr</sub>(0)| &asymp; e<sup>-2&pi;&zeta;N</sup>
+</div>
+<ul class="defs">
+  <li><i>N</i> = number of forcing cycles elapsed</li>
+  <li>|q<sub>tr</sub>(N)| / |q<sub>tr</sub>(0)| = remaining fraction of the transient envelope after <i>N</i> cycles</li>
+  <li>&zeta; = damping ratio</li>
+</ul>
 
-\[
-N_{ss}\approx\frac{-\ln(\varepsilon)}{2\pi\zeta}
-\]
+<p>Setting this equal to &epsilon; gives the resonance formula above.</p>
 
-The required **number of cycles** is therefore controlled mainly by damping ratio and tolerance. The resonant frequency still matters for the **physical time duration**:
+<h2>Examples</h2>
+<p>At resonance:</p>
+<table>
+  <tr><th>Damping ratio</th><th>5% remaining</th><th>1% remaining</th><th>0.1% remaining</th></tr>
+  <tr><td>0.5%</td><td>95.4 cycles</td><td>146.6 cycles</td><td>219.9 cycles</td></tr>
+  <tr><td>1%</td><td>47.7 cycles</td><td>73.3 cycles</td><td>109.9 cycles</td></tr>
+  <tr><td>2%</td><td>23.8 cycles</td><td>36.6 cycles</td><td>55.0 cycles</td></tr>
+  <tr><td>5%</td><td>9.5 cycles</td><td>14.7 cycles</td><td>22.0 cycles</td></tr>
+</table>
 
-\[
-t_{run}=\frac{N_{run}}{f_{res}}
-\]
+<p>A safety factor is recommended because real FE post-processing quantities may combine several modes, phases, and recovered stresses.</p>
 
-## Why this works
+<h2>How to Compare with Harmonic Response</h2>
+<p>For a linear model with the same modal basis, load amplitude, phase convention, damping model, and boundary conditions, the final steady-state transient cycle should match the harmonic response at the same frequency.</p>
 
-For a modal coordinate in an underdamped linear MSUP model,
+<p>Do <b>not</b> compare the harmonic amplitude with the maximum over the entire transient history. The early transient part may add to or subtract from the periodic steady-state response. Compare against the peak from the final complete cycle, or several final complete cycles.</p>
 
-\[
-\ddot q + 2\zeta\omega_n\dot q + \omega_n^2q = p(t)
-\]
+<p>For vector or stress results, compare the same definition used in harmonic post-processing. A harmonic component amplitude is not always the same as an instantaneous vector magnitude or a von Mises stress maximum unless the postprocessor performs the equivalent phase sweep.</p>
 
-The transient response under a harmonic load can be written as
+<h2>Practical Recommendations</h2>
+<ol>
+  <li>Use the harmonic peak frequency or the actual mode frequency as <i>f</i><sub>res</sub>.</li>
+  <li>Use &epsilon; = 1% as a reasonable starting point.</li>
+  <li>Use a safety factor between 1.1 and 1.5.</li>
+  <li>Add at least one complete post-settling cycle for peak extraction.</li>
+  <li>Verify by plotting peak-per-cycle convergence in the transient result.</li>
+  <li>Use enough time points per cycle. This tool suggests a forcing-cycle-based interval, but your solver may require a smaller step to resolve high retained modes, contact status output, stress recovery, or integration accuracy.</li>
+</ol>
 
-\[
-q(t)=q_{ss}(t)+q_{tr}(t)
-\]
+<h2>Limitations</h2>
+<p>This estimate assumes:</p>
+<ul>
+  <li>linear dynamics</li>
+  <li>underdamped modal damping</li>
+  <li>a single-frequency sinusoidal load</li>
+  <li>no nonlinear contacts, plasticity, or frictional status changes</li>
+  <li>no load ramp unless the settling cycles are counted after the ramp</li>
+  <li>consistent damping definition between harmonic and transient analyses</li>
+</ul>
 
-with the homogeneous transient envelope decaying as
-
-\[
-q_{tr}(t)\sim e^{-\zeta\omega_nt}
-\]
-
-At resonance, one forcing period is approximately one modal period, so after \(N\) forcing cycles:
-
-\[
-\frac{|q_{tr}(N)|}{|q_{tr}(0)|}\approx e^{-2\pi\zeta N}
-\]
-
-Setting this equal to \(\varepsilon\) gives the resonance formula above.
-
-## Examples
-
-At resonance:
-
-| Damping ratio | 5% remaining | 1% remaining | 0.1% remaining |
-|---:|---:|---:|---:|
-| 0.5% | 95.4 cycles | 146.6 cycles | 219.9 cycles |
-| 1% | 47.7 cycles | 73.3 cycles | 109.9 cycles |
-| 2% | 23.8 cycles | 36.6 cycles | 55.0 cycles |
-| 5% | 9.5 cycles | 14.7 cycles | 22.0 cycles |
-
-A safety factor is recommended because real FE post-processing quantities may combine several modes, phases, and recovered stresses.
-
-## How to compare with harmonic response
-
-For a linear model with the same modal basis, load amplitude, phase convention, damping model, and boundary conditions, the final steady-state transient cycle should match the harmonic response at the same frequency.
-
-Do **not** compare the harmonic amplitude with the maximum over the entire transient history. The early transient part may add to or subtract from the periodic steady-state response. Compare against the peak from the final complete cycle, or several final complete cycles.
-
-For vector or stress results, compare the same definition used in harmonic post-processing. A harmonic component amplitude is not always the same as an instantaneous vector magnitude or a von Mises stress maximum unless the postprocessor performs the equivalent phase sweep.
-
-## Practical recommendations
-
-1. Use the harmonic peak frequency or the actual mode frequency as \(f_{res}\).
-2. Use \(\varepsilon=1\%\) as a reasonable starting point.
-3. Use a safety factor between 1.1 and 1.5.
-4. Add at least one complete post-settling cycle for peak extraction.
-5. Verify by plotting peak-per-cycle convergence in the transient result.
-6. Use enough time points per cycle. This tool suggests a forcing-cycle-based interval, but your solver may require a smaller step to resolve high retained modes, contact status output, stress recovery, or integration accuracy.
-
-## Limitations
-
-This estimate assumes:
-
-- linear dynamics;
-- underdamped modal damping;
-- a single-frequency sinusoidal load;
-- no nonlinear contacts, plasticity, or frictional status changes;
-- no load ramp unless the settling cycles are counted after the ramp;
-- consistent damping definition between harmonic and transient analyses.
-
-## References
-
-- Ansys Innovation Courses, *Performing Mode Superposition Harmonic Analysis*: harmonic response analysis determines steady-state response to sinusoidal loads; mode superposition is one of the harmonic solution methods.
-- Ansys Innovation Courses, *Summary*: harmonic analysis solves linear steady-state dynamic response to sinusoidally repeating loading.
-- Bentley STAAD.Pro Help, *Steady State and Harmonic Response*: a damped structure under harmonic loading reaches a repeating steady state every forcing cycle.
-- University of Alberta Engineering, *Steady State Harmonic Response*: gives the steady-state harmonic response form for damped vibration.
+<h2>References</h2>
+<ul>
+  <li>Ansys Innovation Courses, <i>Performing Mode Superposition Harmonic Analysis</i></li>
+  <li>Ansys Innovation Courses, <i>Summary</i></li>
+  <li>Bentley STAAD.Pro Help, <i>Steady State and Harmonic Response</i></li>
+  <li>University of Alberta Engineering, <i>Steady State Harmonic Response</i></li>
+</ul>
+</body>
+</html>
 """
 
 INFO_TOOLTIP = (
@@ -272,67 +333,6 @@ def estimate_row(
         n_points=n_points,
         residual_after_run=residual_after_run,
     )
-
-
-def simple_markdown_to_html(markdown_text: str) -> str:
-    """Fallback for old Qt versions without QTextBrowser.setMarkdown."""
-    def inline(s: str) -> str:
-        s = html.escape(s)
-        s = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", s)
-        s = re.sub(r"`([^`]*)`", r"<code>\1</code>", s)
-        return s
-
-    html_lines: List[str] = ["<html><body>"]
-    in_ul = False
-    in_table = False
-    first_table_row = True
-
-    for line in markdown_text.splitlines():
-        s = line.strip()
-        if not s:
-            if in_ul:
-                html_lines.append("</ul>")
-                in_ul = False
-            if in_table:
-                html_lines.append("</table>")
-                in_table = False
-                first_table_row = True
-            continue
-        if s.startswith("#"):
-            if in_ul:
-                html_lines.append("</ul>")
-                in_ul = False
-            if in_table:
-                html_lines.append("</table>")
-                in_table = False
-                first_table_row = True
-            level = min(len(s) - len(s.lstrip("#")), 4)
-            html_lines.append(f"<h{level}>{inline(s[level:].strip())}</h{level}>")
-        elif s.startswith("- "):
-            if not in_ul:
-                html_lines.append("<ul>")
-                in_ul = True
-            html_lines.append(f"<li>{inline(s[2:])}</li>")
-        elif s.startswith("|") and s.endswith("|"):
-            cells = [c.strip() for c in s.strip("|").split("|")]
-            if all(c and set(c) <= set("-:") for c in cells):
-                continue
-            if not in_table:
-                html_lines.append('<table border="1" cellspacing="0" cellpadding="4">')
-                in_table = True
-                first_table_row = True
-            tag = "th" if first_table_row else "td"
-            html_lines.append("<tr>" + "".join(f"<{tag}>{inline(c)}</{tag}>" for c in cells) + "</tr>")
-            first_table_row = False
-        else:
-            html_lines.append(f"<p>{inline(s)}</p>")
-
-    if in_ul:
-        html_lines.append("</ul>")
-    if in_table:
-        html_lines.append("</table>")
-    html_lines.append("</body></html>")
-    return "\n".join(html_lines)
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -470,10 +470,7 @@ class MainWindow(QtWidgets.QMainWindow):
         browser = QtWidgets.QTextBrowser()
         browser.setOpenExternalLinks(True)
         browser.setToolTip("Background notes, formulas, assumptions, and references for the resonance-only estimator.")
-        if hasattr(browser, "setMarkdown"):
-            browser.setMarkdown(DOCS_MD)
-        else:
-            browser.setHtml(simple_markdown_to_html(DOCS_MD))
+        browser.setHtml(DOCS_HTML)
         layout.addWidget(browser)
 
     def _connect_signals(self) -> None:

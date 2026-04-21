@@ -1,6 +1,3 @@
-import html
-import re
-
 import numpy as np
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import (
@@ -27,89 +24,165 @@ from ..analysis.steady_state_estimator import (
 )
 
 
-HELP_MARKDOWN = """
-# Transient Steady-State Cycle Estimator
+HELP_HTML = """
+<html>
+<head>
+<style>
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    line-height: 1.45;
+}
+h1, h2 {
+    color: #1f1f1f;
+}
+.eq {
+    margin: 10px 0 14px 0;
+    padding: 10px 14px;
+    background: #f7f7f7;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    font-family: "Cambria Math", "Times New Roman", serif;
+    font-size: 15px;
+}
+.small-eq {
+    font-size: 14px;
+}
+.defs {
+    margin: 6px 0 14px 18px;
+}
+.defs li {
+    margin: 3px 0;
+}
+table {
+    border-collapse: collapse;
+    margin: 10px 0 14px 0;
+}
+th, td {
+    border: 1px solid #d9d9d9;
+    padding: 6px 10px;
+    text-align: left;
+}
+th {
+    background: #f2f2f2;
+}
+</style>
+</head>
+<body>
+<h1>Transient Steady-State Cycle Estimator</h1>
 
-## Short answer
+<h2>Short answer</h2>
+<ul>
+  <li>A mode-superposition harmonic analysis returns the <b>steady-state</b> response at the driving frequency.</li>
+  <li>A mode-superposition transient analysis with the <b>same linear model</b>, <b>same modal basis</b>, <b>same damping</b>, and the <b>same continuous sinusoidal load</b> converges to the same steady-state sinusoid after the startup transient decays.</li>
+  <li>The <b>absolute maximum over the full transient history</b> is not guaranteed to equal the harmonic peak because startup transients, phase effects, and slight detuning can temporarily shift the time-history maximum.</li>
+</ul>
 
-- A mode-superposition harmonic analysis returns the **steady-state** response at the driving frequency.
-- A mode-superposition transient analysis with the **same linear model**, **same modal basis**, **same damping**, and the **same continuous sinusoidal load** converges to the same steady-state sinusoid after the startup transient decays.
-- The **absolute maximum over the full transient history** is not guaranteed to equal the harmonic peak because startup transients, phase effects, and slight detuning can temporarily shift the time-history maximum.
+<h2>Dominant-Mode Model Used Here</h2>
+<p>For one dominant mode, the modal coordinate is modeled as:</p>
+<div class="eq">
+  q&#776; + 2&zeta;&omega;<sub>n</sub>q&#775; + &omega;<sub>n</sub><sup>2</sup>q = p<sub>0</sub> cos(&omega;t)
+</div>
+<ul class="defs">
+  <li><i>q</i> = modal coordinate or modal response for the dominant mode</li>
+  <li>q&#775; = first time derivative of <i>q</i></li>
+  <li>q&#776; = second time derivative of <i>q</i></li>
+  <li>&zeta; = damping ratio</li>
+  <li>&omega;<sub>n</sub> = dominant natural circular frequency in rad/s</li>
+  <li><i>p</i><sub>0</sub> = modal forcing amplitude</li>
+  <li>&omega; = excitation circular frequency in rad/s</li>
+  <li><i>t</i> = time</li>
+</ul>
 
-## Dominant-mode model used here
+<p>The total response is the sum of a steady-state term and a decaying transient term:</p>
+<div class="eq">
+  q(t) = q<sub>ss</sub>(t) + q<sub>tr</sub>(t)<br>
+  q<sub>tr</sub>(t) &sim; exp(-&zeta;&omega;<sub>n</sub>t)
+</div>
+<ul class="defs">
+  <li>q<sub>ss</sub>(t) = steady-state part of the response</li>
+  <li>q<sub>tr</sub>(t) = startup transient part of the response</li>
+</ul>
 
-For one dominant mode, the modal coordinate is modeled as:
+<p>That exponential envelope is the basis of this estimator.</p>
 
-```text
-q_ddot + 2*zeta*omega_n*q_dot + omega_n^2*q = p0*cos(omega*t)
-```
+<h2>Estimator</h2>
+<p>Choose a residual transient fraction <i>r</i>.</p>
+<ul>
+  <li><code>r = 0.01</code> means <b>1% of the startup transient envelope remains</b></li>
+  <li>equivalently, the response is about <b>99% settled</b> to the steady-state limit</li>
+</ul>
 
-The total response is the sum of a steady-state term and a decaying transient term:
+<p>The required run time is estimated from:</p>
+<div class="eq">
+  t<sub>required</sub> = ln(1 / r) / (&zeta;&omega;<sub>n</sub>)
+</div>
+<ul class="defs">
+  <li>t<sub>required</sub> = estimated run time needed to reduce the startup transient to the chosen residual level</li>
+  <li><i>r</i> = residual transient fraction still allowed at the end of the run</li>
+  <li>&zeta; = damping ratio</li>
+  <li>&omega;<sub>n</sub> = dominant natural circular frequency in rad/s</li>
+</ul>
 
-```text
-q(t) = q_ss(t) + q_tr(t)
-q_tr(t) ~ exp(-zeta*omega_n*t)
-```
+<p>The corresponding number of excitation cycles is:</p>
+<div class="eq">
+  N<sub>cycles</sub> = f<sub>exc</sub> t<sub>required</sub><br>
+  N<sub>cycles</sub> = [&omega; / (2&pi;&zeta;&omega;<sub>n</sub>)] ln(1 / r)
+</div>
+<ul class="defs">
+  <li>N<sub>cycles</sub> = estimated number of forcing cycles required to reach the chosen settling level</li>
+  <li>f<sub>exc</sub> = excitation frequency in Hz</li>
+  <li>t<sub>required</sub> = estimated run time</li>
+  <li>&omega; = excitation circular frequency in rad/s</li>
+  <li>&zeta; = damping ratio</li>
+  <li>&omega;<sub>n</sub> = dominant natural circular frequency in rad/s</li>
+  <li><i>r</i> = residual transient fraction</li>
+</ul>
 
-That exponential envelope is the basis of this estimator.
+<p>If you run the transient at the same dominant resonant frequency identified from harmonic analysis:</p>
+<div class="eq">
+  &omega; &asymp; &omega;<sub>n</sub><br>
+  N<sub>cycles</sub> &asymp; ln(1 / r) / (2&pi;&zeta;)
+</div>
 
-## Estimator
+<p>At exact resonance, the cycle count therefore depends mainly on damping. The selected frequency changes the required <b>time</b>, not much the required <b>cycle count</b>.</p>
 
-Choose a residual transient fraction `r`.
+<h2>Practical Reference Values at Exact Resonance</h2>
+<ul>
+  <li>5% residual transient: <code>N &asymp; 0.477 / &zeta;</code></li>
+  <li>1% residual transient: <code>N &asymp; 0.733 / &zeta;</code></li>
+  <li>0.1% residual transient: <code>N &asymp; 1.099 / &zeta;</code></li>
+</ul>
 
-- `r = 0.01` means **1% of the startup transient envelope remains**
-- equivalently, the response is about **99% settled** to the steady-state limit
+<h2>Several Nearby Resonant Modes</h2>
+<p>If several modes contribute near the excitation frequency, a conservative estimate is based on the slowest modal decay rate:</p>
+<div class="eq small-eq">
+  t<sub>required</sub> &asymp; max<sub>i</sub> [ln(1 / r) / (&zeta;<sub>i</sub>&omega;<sub>n,i</sub>)]
+</div>
+<ul class="defs">
+  <li><i>i</i> = mode index</li>
+  <li>&zeta;<sub>i</sub> = damping ratio of mode <i>i</i></li>
+  <li>&omega;<sub>n,i</sub> = natural circular frequency of mode <i>i</i></li>
+  <li>max<sub>i</sub> means use the slowest-decaying contributing mode as the conservative settling estimate</li>
+</ul>
 
-The required run time is estimated from:
+<p>This dialog is intended for the common case you described: a transient run driven at a known dominant resonant frequency from the harmonic study.</p>
 
-```text
-t_required = ln(1/r) / (zeta*omega_n)
-```
+<h2>Interpretation</h2>
+<ul>
+  <li><b>Harmonic result</b>: steady-state amplitude at the selected frequency</li>
+  <li><b>Transient result after settling</b>: should match the harmonic amplitude within numerical tolerance</li>
+  <li><b>Transient maximum over all time</b>: can be slightly lower or higher before settling</li>
+</ul>
 
-The corresponding number of excitation cycles is:
-
-```text
-N_cycles = f_exc * t_required
-         = (omega / (2*pi*zeta*omega_n)) * ln(1/r)
-```
-
-If you run the transient at the same dominant resonant frequency identified from harmonic analysis:
-
-```text
-omega ~= omega_n
-N_cycles ~= ln(1/r) / (2*pi*zeta)
-```
-
-At exact resonance, the cycle count therefore depends mainly on damping. The selected frequency changes the required **time**, not much the required **cycle count**.
-
-## Practical reference values at exact resonance
-
-- 5% residual transient: `N ~= 0.477 / zeta`
-- 1% residual transient: `N ~= 0.733 / zeta`
-- 0.1% residual transient: `N ~= 1.099 / zeta`
-
-## Several nearby resonant modes
-
-If several modes contribute near the excitation frequency, a conservative estimate is based on the slowest modal decay rate:
-
-```text
-t_required ~= max_i [ ln(1/r) / (zeta_i*omega_n_i) ]
-```
-
-This dialog is intended for the common case you described: a transient run driven at a known dominant resonant frequency from the harmonic study.
-
-## Interpretation
-
-- **Harmonic result**: steady-state amplitude at the selected frequency
-- **Transient result after settling**: should match the harmonic amplitude within numerical tolerance
-- **Transient maximum over all time**: can be slightly lower or higher before settling
-
-## References
-
-1. [ANSYS Help: Harmonic Response](https://ansyshelp.ansys.com/public/Views/Secured/corp/v242/en/wb2_help/wb2h_harmrespAN.html)
-2. [ANSYS Help: Mode-Superposition Transient Dynamic Analysis](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_str/Hlp_G_STR5_10.html)
-3. [Engineering LibreTexts: Forced Vibrations](https://eng.libretexts.org/Bookshelves/Mechanical_Engineering/Introductory_Dynamics%3A_2D_Kinematics_and_Kinetics_of_Point_Masses_and_Rigid_Bodies_%28Steeneken%29/04%3A_Vibrations_and_Strategy/13%3A_Vibrations/13.04%3A_Forced_vibrations)
-4. [MIT OpenCourseWare: Forced Oscillation and Resonance](https://ocw.mit.edu/courses/8-03sc-physics-iii-vibrations-and-waves-fall-2016/782069da3820fc514c10c26ae0c15b01_MIT8_03SCF16_Text_Ch2.pdf)
+<h2>References</h2>
+<ol>
+  <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v242/en/wb2_help/wb2h_harmrespAN.html">ANSYS Help: Harmonic Response</a></li>
+  <li><a href="https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_str/Hlp_G_STR5_10.html">ANSYS Help: Mode-Superposition Transient Dynamic Analysis</a></li>
+  <li><a href="https://eng.libretexts.org/Bookshelves/Mechanical_Engineering/Introductory_Dynamics%3A_2D_Kinematics_and_Kinetics_of_Point_Masses_and_Rigid_Bodies_%28Steeneken%29/04%3A_Vibrations_and_Strategy/13%3A_Vibrations/13.04%3A_Forced_vibrations">Engineering LibreTexts: Forced Vibrations</a></li>
+  <li><a href="https://ocw.mit.edu/courses/8-03sc-physics-iii-vibrations-and-waves-fall-2016/782069da3820fc514c10c26ae0c15b01_MIT8_03SCF16_Text_Ch2.pdf">MIT OpenCourseWare: Forced Oscillation and Resonance</a></li>
+</ol>
+</body>
+</html>
 """
 
 INTRO_TOOLTIP = (
@@ -296,10 +369,7 @@ class SteadyStateCycleEstimatorDialog(QDialog):
         help_browser = QTextBrowser()
         help_browser.setOpenExternalLinks(True)
         help_browser.setToolTip(DOCS_TOOLTIP)
-        if hasattr(help_browser, "setMarkdown"):
-            help_browser.setMarkdown(HELP_MARKDOWN)
-        else:
-            help_browser.setHtml(self._markdown_to_html(HELP_MARKDOWN))
+        help_browser.setHtml(HELP_HTML)
 
         layout.addWidget(help_browser)
         return page
@@ -376,115 +446,3 @@ class SteadyStateCycleEstimatorDialog(QDialog):
                 self.threshold_table.setItem(row, column, item)
 
         self.threshold_table.resizeRowsToContents()
-
-    @staticmethod
-    def _format_inline_markdown(text: str) -> str:
-        link_pattern = re.compile(r"\[([^\]]+)\]\((https?://[^)]+)\)")
-        result_parts = []
-        last_index = 0
-
-        for match in link_pattern.finditer(text):
-            result_parts.append(html.escape(text[last_index:match.start()]))
-            label = html.escape(match.group(1))
-            url = html.escape(match.group(2), quote=True)
-            result_parts.append(f'<a href="{url}">{label}</a>')
-            last_index = match.end()
-
-        result_parts.append(html.escape(text[last_index:]))
-        formatted = "".join(result_parts)
-        formatted = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", formatted)
-        formatted = re.sub(r"`([^`]+)`", r"<code>\1</code>", formatted)
-        return formatted
-
-    @classmethod
-    def _markdown_to_html(cls, markdown_text: str) -> str:
-        html_parts = ["<html><body>"]
-        paragraph_lines = []
-        in_unordered_list = False
-        in_ordered_list = False
-        in_code_block = False
-        code_lines = []
-
-        def flush_paragraph():
-            nonlocal paragraph_lines
-            if not paragraph_lines:
-                return
-            combined = " ".join(line.strip() for line in paragraph_lines)
-            html_parts.append(f"<p>{cls._format_inline_markdown(combined)}</p>")
-            paragraph_lines = []
-
-        def close_lists():
-            nonlocal in_unordered_list, in_ordered_list
-            if in_unordered_list:
-                html_parts.append("</ul>")
-                in_unordered_list = False
-            if in_ordered_list:
-                html_parts.append("</ol>")
-                in_ordered_list = False
-
-        for raw_line in markdown_text.strip().splitlines():
-            line = raw_line.rstrip()
-
-            if line.startswith("```"):
-                flush_paragraph()
-                close_lists()
-                if in_code_block:
-                    html_parts.append("<pre><code>{}</code></pre>".format("\n".join(code_lines)))
-                    code_lines = []
-                    in_code_block = False
-                else:
-                    in_code_block = True
-                continue
-
-            if in_code_block:
-                code_lines.append(html.escape(line))
-                continue
-
-            stripped = line.strip()
-            if not stripped:
-                flush_paragraph()
-                close_lists()
-                continue
-
-            heading_match = re.match(r"^(#{1,6})\s+(.*)$", stripped)
-            if heading_match:
-                flush_paragraph()
-                close_lists()
-                level = len(heading_match.group(1))
-                text = cls._format_inline_markdown(heading_match.group(2))
-                html_parts.append(f"<h{level}>{text}</h{level}>")
-                continue
-
-            unordered_match = re.match(r"^-\s+(.*)$", stripped)
-            if unordered_match:
-                flush_paragraph()
-                if in_ordered_list:
-                    html_parts.append("</ol>")
-                    in_ordered_list = False
-                if not in_unordered_list:
-                    html_parts.append("<ul>")
-                    in_unordered_list = True
-                html_parts.append(f"<li>{cls._format_inline_markdown(unordered_match.group(1))}</li>")
-                continue
-
-            ordered_match = re.match(r"^\d+\.\s+(.*)$", stripped)
-            if ordered_match:
-                flush_paragraph()
-                if in_unordered_list:
-                    html_parts.append("</ul>")
-                    in_unordered_list = False
-                if not in_ordered_list:
-                    html_parts.append("<ol>")
-                    in_ordered_list = True
-                html_parts.append(f"<li>{cls._format_inline_markdown(ordered_match.group(1))}</li>")
-                continue
-
-            paragraph_lines.append(stripped)
-
-        if in_code_block:
-            html_parts.append("<pre><code>{}</code></pre>".format("\n".join(code_lines)))
-
-        flush_paragraph()
-        close_lists()
-        html_parts.append("</body></html>")
-        return "\n".join(html_parts)
