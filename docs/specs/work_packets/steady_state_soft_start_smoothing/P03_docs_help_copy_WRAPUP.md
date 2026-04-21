@@ -29,7 +29,7 @@ Kept the central estimator tooltip short and moved the longer theory, caveats, a
   - Result: OK.
 - PASS: `git diff --check`
 
-- Final Verification Verdict: PASS with the known repository-wide discovery blocker carried forward.
+- Final Verification Verdict: PASS
 
 ## Manual Test Directives
 
