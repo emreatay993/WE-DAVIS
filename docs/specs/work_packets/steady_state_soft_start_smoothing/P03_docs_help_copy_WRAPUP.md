@@ -5,7 +5,7 @@
 - Packet: `P03`
 - Branch Label: `codex/steady_state_soft_start_smoothing/p03-docs-help-copy`
 - Commit Owner: `worker`
-- Commit SHA: `a5386d69109e43961920baed37dbfead8f98615e`
+- Commit SHA: `516e5b4ef21a2e6f3e767ac25018da2bc0c0fefa`
 - Changed Files: `app/ui/steady_state_cycle_estimator_dialog.py`, `app/tooltips.py`, `docs/UI-Guide.md`, `docs/modules/analysis.md`, `docs/modules/ui.md`, `docs/specs/work_packets/steady_state_soft_start_smoothing/P03_docs_help_copy_WRAPUP.md`
 - Artifacts Produced: `docs/specs/work_packets/steady_state_soft_start_smoothing/P03_docs_help_copy_WRAPUP.md`
 
@@ -14,6 +14,8 @@ Updated the steady-state cycle estimator help tab with the exact-resonance short
 Documented that repeated steady-state loads can create an artificial initial step when a downstream transient model starts from zero state, and that the export uses a one-sided half-cosine ramp instead of the existing full Tukey window so final exported cycles remain at full steady-state amplitude.
 
 Kept the central estimator tooltip short and moved the longer theory, caveats, and references into help/docs surfaces. Updated user and module docs to describe the P01/P02 behavior without changing runtime behavior.
+
+Remediation added the plan-specific ANSYS and SciPy references for ramped/stepped loads, transient initial conditions, transient analysis theory, Mechanical transient structural analysis, multibody initial conditions, and the SciPy v1.14.1 Tukey reference citing Harris 1978.
 
 ## Verification
 
