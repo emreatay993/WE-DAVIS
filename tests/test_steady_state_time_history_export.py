@@ -62,7 +62,18 @@ def _install_dialog_dependency_stubs() -> None:
         WindowMaximizeButtonHint = 2
         WidgetWithChildrenShortcut = 3
 
-    qtcore_module.Qt = getattr(qtcore_module, "Qt", _QtNamespace)
+    qt_namespace = getattr(qtcore_module, "Qt", None)
+    if qt_namespace is None:
+        qt_namespace = _QtNamespace
+    for attr_name in (
+        "NoContextMenu",
+        "WindowMinimizeButtonHint",
+        "WindowMaximizeButtonHint",
+        "WidgetWithChildrenShortcut",
+    ):
+        if not hasattr(qt_namespace, attr_name):
+            setattr(qt_namespace, attr_name, getattr(_QtNamespace, attr_name))
+    qtcore_module.Qt = qt_namespace
     qtgui_module.QIntValidator = getattr(qtgui_module, "QIntValidator", _Widget)
     qtgui_module.QKeySequence = getattr(qtgui_module, "QKeySequence", _Widget)
 
@@ -100,11 +111,7 @@ def _install_dialog_dependency_stubs() -> None:
         ModuleType("app.plotting.plotter"),
     )
     plotter_module.Plotter = getattr(plotter_module, "Plotter", type("Plotter", (), {}))
-    plotter_module.load_fig_to_webview = getattr(
-        plotter_module,
-        "load_fig_to_webview",
-        lambda *args, **kwargs: None,
-    )
+    plotter_module.load_fig_to_webview = lambda *args, **kwargs: None
     sys.modules["app.plotting.plotter"] = plotter_module
 
 

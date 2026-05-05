@@ -99,7 +99,7 @@ This guide walks through the complete workflow for WE MechLoad Viewer, from inst
    - Versions are sorted with the latest version listed first and selected by default.
    - If no versions are detected, the dropdown shows "Use Latest Available" and will use the latest version found by `ansys-mechanical-core`.
 5. Click Confirm to proceed with the export.
-6. The application exports intermediate CSV files (original units and scaled by 1000) and launches the selected version of Ansys Mechanical through the automation API:
+6. The application exports unit-aware CSV files using the Settings tab's Export Units mode, shows a confirmation dialog, opens the combined CSV file with the OS default app, and then launches the selected version of Ansys Mechanical through the automation API:
    - Frequency-domain data creates a harmonic response template with complex loads.
    - Time-domain data creates a transient template with the appropriate sampling rate.
 7. On success the generated `.mechdat` assets are saved in the working directory and Ansys is opened for review.

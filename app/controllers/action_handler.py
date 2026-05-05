@@ -129,6 +129,27 @@ class ActionHandler(QtCore.QObject):
         unit = self._get_export_unit_label(context)
         return f"{column_name} [{unit}]" if unit else column_name
 
+    def _build_unit_aware_export_frame(self, frame, export_context_map):
+        column_labels = {
+            column_name: self._format_export_column_label(
+                column_name,
+                export_context_map.get(column_name),
+            )
+            for column_name in frame.columns
+        }
+        return frame.rename(columns=column_labels)
+
+    def _format_ansys_export_unit_summary(self, data_domain, export_units):
+        domain_label = "Frequency" if data_domain == "FREQ" else "Time"
+        lines = [
+            f"{domain_label}: {export_units.domain_unit}",
+            f"Forces (T1/T2/T3): {export_units.force_unit}",
+            f"Moments (R1/R2/R3): {export_units.moment_unit}",
+        ]
+        if data_domain == "FREQ":
+            lines.append(f"Phases: {export_units.phase_unit}")
+        return "\n".join(lines)
+
     def _validate_ansys_export_units(self, export_frame, export_context_map):
         if export_frame is None or export_frame.empty:
             return None, "ANSYS export requires at least one selected data column."
@@ -569,7 +590,7 @@ class ActionHandler(QtCore.QObject):
             side_cols_to_keep.extend([c for c in df_export_processed.columns if side_pattern.search(c)])
             df_part_export = df_export_processed[list(OrderedDict.fromkeys(side_cols_to_keep))]
 
-            df_part_export.to_csv(
+            self._build_unit_aware_export_frame(df_part_export, export_context_map).to_csv(
                 f"extracted_data_for_{side}_in_{export_mode_slug}.csv",
                 index=False,
             )
@@ -580,10 +601,22 @@ class ActionHandler(QtCore.QObject):
                 df_to_concat = df_part_export.drop(columns=[data_domain])
                 df_combined_export = pd.concat([df_combined_export, df_to_concat], axis=1)
 
-        df_combined_export.to_csv(
-            f"extracted_loads_of_all_selected_parts_in_{export_mode_slug}.csv",
+        combined_csv_path = f"extracted_loads_of_all_selected_parts_in_{export_mode_slug}.csv"
+        self._build_unit_aware_export_frame(df_combined_export, export_context_map).to_csv(
+            combined_csv_path,
             index=False,
         )
+        combined_csv_abspath = os.path.abspath(combined_csv_path)
+        QMessageBox.information(
+            self.main_window,
+            "CSV Extraction Complete",
+            "Selected part loads were successfully extracted as a unit-aware CSV before "
+            "ANSYS template creation.\n\n"
+            f"Settings > Export Units: {self._get_export_mode_label()} mode\n"
+            f"{self._format_ansys_export_unit_summary(data_domain, export_units)}\n\n"
+            f"CSV file:\n{combined_csv_abspath}",
+        )
+        os.startfile(combined_csv_abspath)
 
         exporter = AnsysExporter(version=selected_version, ansys_base_path=ansys_base_path)
         if data_domain == 'FREQ':

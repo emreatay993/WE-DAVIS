@@ -52,7 +52,8 @@ for finite element analysis.<br><br>
 <b>This button will:</b><br>
 &#8226; Open a dialog to select which parts (sides) to export<br>
 &#8226; Let you choose the specific ANSYS version to use for template generation<br>
-&#8226; Export intermediate CSV files (original units and scaled by 1000)<br>
+&#8226; Export unit-aware CSV files using the Settings tab's Export Units mode<br>
+&#8226; Confirm and open the combined CSV before ANSYS template generation starts<br>
 &#8226; Launch ANSYS Mechanical with the appropriate analysis template<br><br>
 <b>Generated templates:</b><br>
 &#8226; <b>Frequency-domain data:</b> Harmonic response analysis with complex loads<br>

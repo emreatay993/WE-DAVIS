@@ -357,11 +357,25 @@ class ExportUnitModeTests(unittest.TestCase):
 
         def _capture_to_csv(frame, path, *args, **kwargs):
             captured_exports[path] = frame.copy(deep=True)
+            if path == "extracted_loads_of_all_selected_parts_in_display_units.csv":
+                export_events.append("csv")
             return None
+
+        export_events = []
+        opened_paths = []
+
+        def _record_open(path):
+            opened_paths.append(path)
+            export_events.append("open")
 
         with patch.object(ActionHandler, "_get_sides_for_export", return_value=(["STBD"], (232, r"C:\ANSYS"))), \
                 patch("app.controllers.action_handler.AnsysExporter") as exporter_cls, \
-                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv):
+                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv), \
+                patch.object(QMessageBox, "information", side_effect=lambda *a, **k: export_events.append("modal")), \
+                patch("app.controllers.action_handler.os.startfile", side_effect=_record_open):
+            exporter_cls.return_value.create_harmonic_template.side_effect = (
+                lambda *a, **k: export_events.append("template")
+            )
             handler.handle_ansys_export()
 
         exporter = exporter_cls.return_value
@@ -385,6 +399,19 @@ class ExportUnitModeTests(unittest.TestCase):
         self.assertAlmostEqual(exported_frame["Phase_Mount STBD T1"].iloc[0], math.pi / 2, places=6)
         self.assertIn("extracted_data_for_STBD_in_display_units.csv", captured_exports)
         self.assertIn("extracted_loads_of_all_selected_parts_in_display_units.csv", captured_exports)
+        combined_csv_frame = captured_exports["extracted_loads_of_all_selected_parts_in_display_units.csv"]
+        self.assertEqual(
+            combined_csv_frame.columns.tolist(),
+            [
+                "FREQ [kHz]",
+                "Mount STBD T1 [N]",
+                "Mount STBD R1 [N*mm]",
+                "Phase_Mount STBD T1 [rad]",
+                "Phase_Mount STBD R1 [rad]",
+            ],
+        )
+        self.assertEqual(export_events, ["csv", "modal", "open", "template"])
+        self.assertTrue(opened_paths[0].endswith("extracted_loads_of_all_selected_parts_in_display_units.csv"))
         self.assertFalse(any("multiplied" in export_path for export_path in captured_exports))
 
     def test_ansys_export_keeps_detected_source_units_when_source_mode_selected(self) -> None:
@@ -433,7 +460,9 @@ class ExportUnitModeTests(unittest.TestCase):
 
         with patch.object(ActionHandler, "_get_sides_for_export", return_value=(["STBD"], (232, r"C:\ANSYS"))), \
                 patch("app.controllers.action_handler.AnsysExporter") as exporter_cls, \
-                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv):
+                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv), \
+                patch.object(QMessageBox, "information", return_value=None), \
+                patch("app.controllers.action_handler.os.startfile", return_value=None):
             handler.handle_ansys_export()
 
         exporter = exporter_cls.return_value
@@ -457,6 +486,17 @@ class ExportUnitModeTests(unittest.TestCase):
         self.assertAlmostEqual(exported_frame["Phase_Mount STBD T1"].iloc[0], 90.0, places=6)
         self.assertIn("extracted_data_for_STBD_in_source_units.csv", captured_exports)
         self.assertIn("extracted_loads_of_all_selected_parts_in_source_units.csv", captured_exports)
+        combined_csv_frame = captured_exports["extracted_loads_of_all_selected_parts_in_source_units.csv"]
+        self.assertEqual(
+            combined_csv_frame.columns.tolist(),
+            [
+                "FREQ [Hz]",
+                "Mount STBD T1 [kN]",
+                "Mount STBD R1 [kN*m]",
+                "Phase_Mount STBD T1 [deg]",
+                "Phase_Mount STBD R1 [deg]",
+            ],
+        )
 
     def test_ansys_export_accepts_time_domain_with_seconds_context(self) -> None:
         df = pd.DataFrame(
@@ -486,7 +526,9 @@ class ExportUnitModeTests(unittest.TestCase):
 
         with patch.object(ActionHandler, "_get_sides_for_export", return_value=(["STBD"], (232, r"C:\ANSYS"))), \
                 patch("app.controllers.action_handler.AnsysExporter") as exporter_cls, \
-                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv):
+                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv), \
+                patch.object(QMessageBox, "information", return_value=None), \
+                patch("app.controllers.action_handler.os.startfile", return_value=None):
             handler.handle_ansys_export()
 
         exporter = exporter_cls.return_value
@@ -507,6 +549,11 @@ class ExportUnitModeTests(unittest.TestCase):
         self.assertAlmostEqual(exported_frame["TIME"].iloc[1], 0.25, places=6)
         self.assertIn("extracted_data_for_STBD_in_source_units.csv", captured_exports)
         self.assertIn("extracted_loads_of_all_selected_parts_in_source_units.csv", captured_exports)
+        combined_csv_frame = captured_exports["extracted_loads_of_all_selected_parts_in_source_units.csv"]
+        self.assertEqual(
+            combined_csv_frame.columns.tolist(),
+            ["TIME [s]", "Mount STBD T1 [kN]", "Mount STBD R1 [kN*m]"],
+        )
 
     def test_time_domain_export_converts_displayed_plot_back_to_source_units(self) -> None:
         df = pd.DataFrame({"FREQ": [1000.0]})
