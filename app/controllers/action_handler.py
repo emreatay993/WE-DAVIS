@@ -21,6 +21,7 @@ from ..analysis.steady_state_estimator import (
 from ..analysis.steady_state_time_history_export import resolve_frequency_to_hz
 from ..ui.tab_settings import SettingsTab
 from ..units import ColumnUnitContext, ConversionSpec, convert_dataframe_copy, convert_series
+from ..utils.helpers import extract_component_suffix
 
 
 class ActionHandler(QtCore.QObject):
@@ -546,10 +547,15 @@ class ActionHandler(QtCore.QObject):
             return
 
         cols_to_keep = [data_domain]
+        direct_components = {"T1", "T2", "T3", "R1", "R2", "R3"}
         for side in selected_sides:
             side_pattern = re.compile(rf'\b{re.escape(side)}\b')
             cols_to_keep.extend(
-                [c for c in df.columns if side_pattern.search(c) and not any(s in c for s in ['T2/T3', 'R2/R3'])]
+                [
+                    c
+                    for c in df.columns
+                    if side_pattern.search(c) and extract_component_suffix(c) in direct_components
+                ]
             )
         df_processed = df[list(OrderedDict.fromkeys(cols_to_keep))].copy()
 

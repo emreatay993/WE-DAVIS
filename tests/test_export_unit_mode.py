@@ -498,6 +498,99 @@ class ExportUnitModeTests(unittest.TestCase):
             ],
         )
 
+    def test_ansys_export_omits_resultant_components_from_csv_and_template_inputs(self) -> None:
+        df = pd.DataFrame(
+            {
+                "FREQ": [1000.0, 2000.0],
+                "Mount STBD T1": [1.0, 2.0],
+                "Mount STBD T2": [3.0, 4.0],
+                "Mount STBD T1/T2": [5.0, 6.0],
+                "Mount STBD T2/T3": [7.0, 8.0],
+                "Mount STBD R1": [0.5, 1.0],
+                "Mount STBD R1/R2": [1.5, 2.0],
+                "Phase_Mount STBD T1": [90.0, 180.0],
+                "Phase_Mount STBD T1/T2": [45.0, 90.0],
+                "Phase_Mount STBD R1": [0.0, 45.0],
+                "Phase_Mount STBD R1/R2": [15.0, 30.0],
+            }
+        )
+        raw_unit_context = {
+            "FREQ": ColumnUnitContext.from_source_unit("FREQ", "Hz"),
+            "Mount STBD T1": ColumnUnitContext.from_source_unit("Mount STBD T1", "kN"),
+            "Mount STBD T2": ColumnUnitContext.from_source_unit("Mount STBD T2", "kN"),
+            "Mount STBD T1/T2": ColumnUnitContext.from_source_unit("Mount STBD T1/T2", "kN"),
+            "Mount STBD T2/T3": ColumnUnitContext.from_source_unit("Mount STBD T2/T3", "kN"),
+            "Mount STBD R1": ColumnUnitContext.from_source_unit("Mount STBD R1", "kN*m"),
+            "Mount STBD R1/R2": ColumnUnitContext.from_source_unit("Mount STBD R1/R2", "kN*m"),
+            "Phase_Mount STBD T1": ColumnUnitContext.from_source_unit(
+                "Phase_Mount STBD T1",
+                "deg",
+                family_hint="phase",
+            ),
+            "Phase_Mount STBD T1/T2": ColumnUnitContext.from_source_unit(
+                "Phase_Mount STBD T1/T2",
+                "deg",
+                family_hint="phase",
+            ),
+            "Phase_Mount STBD R1": ColumnUnitContext.from_source_unit(
+                "Phase_Mount STBD R1",
+                "deg",
+                family_hint="phase",
+            ),
+            "Phase_Mount STBD R1/R2": ColumnUnitContext.from_source_unit(
+                "Phase_Mount STBD R1/R2",
+                "deg",
+                family_hint="phase",
+            ),
+        }
+        handler, _ = self._build_handler(
+            df,
+            raw_unit_context,
+            data_domain="FREQ",
+            export_mode=SettingsTab.EXPORT_SOURCE_UNITS,
+        )
+
+        captured_exports = {}
+
+        def _capture_to_csv(frame, path, *args, **kwargs):
+            captured_exports[path] = frame.copy(deep=True)
+            return None
+
+        with patch.object(ActionHandler, "_get_sides_for_export", return_value=(["STBD"], (232, r"C:\ANSYS"))), \
+                patch("app.controllers.action_handler.AnsysExporter") as exporter_cls, \
+                patch.object(pd.DataFrame, "to_csv", autospec=True, side_effect=_capture_to_csv), \
+                patch.object(QMessageBox, "information", return_value=None), \
+                patch("app.controllers.action_handler.os.startfile", return_value=None):
+            handler.handle_ansys_export()
+
+        exporter = exporter_cls.return_value
+        exporter.create_harmonic_template.assert_called_once()
+        exported_frame = exporter.create_harmonic_template.call_args.args[0]
+        self.assertEqual(
+            exported_frame.columns.tolist(),
+            [
+                "FREQ",
+                "Mount STBD T1",
+                "Mount STBD T2",
+                "Mount STBD R1",
+                "Phase_Mount STBD T1",
+                "Phase_Mount STBD R1",
+            ],
+        )
+
+        combined_csv_frame = captured_exports["extracted_loads_of_all_selected_parts_in_source_units.csv"]
+        self.assertEqual(
+            combined_csv_frame.columns.tolist(),
+            [
+                "FREQ [Hz]",
+                "Mount STBD T1 [kN]",
+                "Mount STBD T2 [kN]",
+                "Mount STBD R1 [kN*m]",
+                "Phase_Mount STBD T1 [deg]",
+                "Phase_Mount STBD R1 [deg]",
+            ],
+        )
+
     def test_ansys_export_accepts_time_domain_with_seconds_context(self) -> None:
         df = pd.DataFrame(
             {

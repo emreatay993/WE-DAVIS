@@ -17,7 +17,7 @@ from app.units import (
     infer_quantity_family,
     normalize_unit,
 )
-from app.utils.helpers import extract_interface_name, extract_part_side
+from app.utils.helpers import extract_component_suffix, extract_interface_name, extract_part_side
 
 
 class UnitContractSmokeTests(unittest.TestCase):
@@ -183,6 +183,13 @@ class PldLabelParsingTests(unittest.TestCase):
         self.assertEqual(extract_interface_name("I2A - PORT REAR MOUNT R1"), "I2A")
         self.assertEqual(extract_interface_name("I3-TT/FBS/IPS - TT Side T1"), "I3")
         self.assertIsNone(extract_interface_name("TIME"))
+
+    def test_extracts_direct_and_resultant_component_suffixes(self) -> None:
+        self.assertEqual(extract_component_suffix("I1 - STBD REAR MOUNT T1"), "T1")
+        self.assertEqual(extract_component_suffix("Phase_I1 - STBD REAR MOUNT R3"), "R3")
+        self.assertEqual(extract_component_suffix("I1 - STBD REAR MOUNT T1/T2"), "T1/T2")
+        self.assertEqual(extract_component_suffix("I1 - STBD REAR MOUNT (R1/R2)"), "R1/R2")
+        self.assertIsNone(extract_component_suffix("FREQ"))
 
 
 if __name__ == "__main__":

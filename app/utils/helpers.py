@@ -4,19 +4,32 @@ from typing import Optional
 
 _INTERFACE_RE = re.compile(r"^\s*(?P<interface>I\d+[A-Za-z]?)(?=\D|$)")
 _COMPONENT_SUFFIX_RE = re.compile(
-    r"\s+(?:\((?P<paren_component>T2/T3|R2/R3|T[123]|R[123])\)|"
-    r"(?P<plain_component>T2/T3|R2/R3|T[123]|R[123]))\s*$"
+    r"\s+(?:\((?P<paren_component>[TR][123](?:/[TR]?[123])?)\)|"
+    r"(?P<plain_component>[TR][123](?:/[TR]?[123])?))\s*$"
 )
 _SIDE_SEPARATOR_RE = re.compile(r"\s-\s*")
 _TRAILING_PARENTHESES_RE = re.compile(r"\s*\([^)]*\)\s*$")
 
 
+def _strip_phase_prefix(column_name: object) -> str:
+    text = str(column_name or "").strip()
+    return text[6:] if text.startswith("Phase_") else text
+
+
 def extract_interface_name(column_name: object) -> Optional[str]:
     """Return the leading interface id from a PLD channel label."""
-    match = _INTERFACE_RE.match(str(column_name or ""))
+    match = _INTERFACE_RE.match(_strip_phase_prefix(column_name))
     if match is None:
         return None
     return match.group("interface")
+
+
+def extract_component_suffix(column_name: object) -> Optional[str]:
+    """Return the trailing PLD component suffix, including resultants."""
+    match = _COMPONENT_SUFFIX_RE.search(_strip_phase_prefix(column_name))
+    if match is None:
+        return None
+    return match.group("paren_component") or match.group("plain_component")
 
 
 def extract_part_side(column_name: object) -> Optional[str]:
