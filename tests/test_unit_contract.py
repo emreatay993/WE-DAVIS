@@ -17,6 +17,7 @@ from app.units import (
     infer_quantity_family,
     normalize_unit,
 )
+from app.utils.helpers import extract_interface_name, extract_part_side
 
 
 class UnitContractSmokeTests(unittest.TestCase):
@@ -144,6 +145,44 @@ class ConversionHelperTests(unittest.TestCase):
     def test_rejects_unknown_units(self) -> None:
         with self.assertRaises(UnknownUnitError):
             convert_scalar(1.0, "psi", "kN")
+
+
+class PldLabelParsingTests(unittest.TestCase):
+    def test_extracts_side_when_coordinate_system_is_present(self) -> None:
+        self.assertEqual(
+            extract_part_side("I1 - STBD REAR MOUNT (CS-8012) T1"),
+            "STBD REAR MOUNT",
+        )
+        self.assertEqual(
+            extract_part_side("I3-TT/FBS/IPS - TT Side (CS-8001) R2/R3"),
+            "TT Side",
+        )
+
+    def test_extracts_side_when_coordinate_system_is_omitted(self) -> None:
+        self.assertEqual(
+            extract_part_side("I1 - STBD REAR MOUNT T1"),
+            "STBD REAR MOUNT",
+        )
+        self.assertEqual(
+            extract_part_side("I2A - PORT REAR MOUNT R1"),
+            "PORT REAR MOUNT",
+        )
+
+    def test_extracts_side_when_component_suffix_is_parenthesized(self) -> None:
+        self.assertEqual(
+            extract_part_side("I1A - SideName (T1)"),
+            "SideName",
+        )
+
+    def test_ignores_non_channel_and_phase_labels(self) -> None:
+        self.assertIsNone(extract_part_side("FREQ"))
+        self.assertIsNone(extract_part_side("Phase_I1 - STBD REAR MOUNT T1"))
+
+    def test_extracts_interface_name_from_channel_labels(self) -> None:
+        self.assertEqual(extract_interface_name("I1 - STBD REAR MOUNT T1"), "I1")
+        self.assertEqual(extract_interface_name("I2A - PORT REAR MOUNT R1"), "I2A")
+        self.assertEqual(extract_interface_name("I3-TT/FBS/IPS - TT Side T1"), "I3")
+        self.assertIsNone(extract_interface_name("TIME"))
 
 
 if __name__ == "__main__":

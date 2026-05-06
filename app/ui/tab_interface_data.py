@@ -1,10 +1,10 @@
 # File: app/ui/tab_interface_data.py
 
-import re
 from natsort import natsorted
 from PyQt5 import QtWidgets, QtCore, QtWebEngineWidgets
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QSizePolicy
 from ..plotting.plotter import load_fig_to_webview
+from ..utils.helpers import extract_interface_name, extract_part_side
 from .widgets.checkable_combo_box import CheckableComboBox
 
 
@@ -111,9 +111,9 @@ class InterfaceDataTab(QtWidgets.QWidget):
         return natsorted(
             list(
                 {
-                    match.group(0)
+                    interface_name
                     for col in self.df.columns
-                    if (match := re.match(r'I\d+[A-Za-z]?', col.split(' ')[0]))
+                    if (interface_name := extract_interface_name(col))
                 }
             )
         )
@@ -122,16 +122,12 @@ class InterfaceDataTab(QtWidgets.QWidget):
         if self.df is None or not interface_name:
             return []
 
-        pattern = re.compile(r'I\d+[a-zA-Z]?\s*-\s*(.*?)(?=\s*\()')
-        relevant_cols = [
-            col for col in self.df.columns
-            if re.match(rf"^{re.escape(interface_name)}(?=\D)", col)
-        ]
         return sorted(
             {
-                match.group(1).strip()
-                for col in relevant_cols
-                if (match := pattern.search(col))
+                side
+                for col in self.df.columns
+                if extract_interface_name(col) == interface_name
+                if (side := extract_part_side(col))
             }
         )
 

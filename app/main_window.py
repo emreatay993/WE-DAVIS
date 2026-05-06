@@ -1,7 +1,6 @@
 # File: app/main_window.py
 
 import os
-import re
 import pandas as pd
 
 from PyQt5 import QtWidgets, QtCore
@@ -21,6 +20,7 @@ from . import config_manager
 from .controllers.plot_controller import PlotController
 from .controllers.action_handler import ActionHandler
 from .version import APP_DISPLAY_NAME
+from .utils.helpers import extract_part_side
 
 
 class MainWindow(QMainWindow):
@@ -211,7 +211,13 @@ class MainWindow(QMainWindow):
         # Interface Data Tab refresh is delegated to the tab itself.
 
         # Part Loads & Compare Part Loads Tabs
-        sides = sorted(list(set(m.group(1).strip() for c in self.df.columns if not c.startswith('Phase_') and (m := re.search(r'(?<=\s-)(.*?)(?=\s*\()', c)))))
+        sides = sorted(
+            {
+                side
+                for column_name in self.df.columns
+                if (side := extract_part_side(column_name))
+            }
+        )
         self.tab_part_loads.set_available_sides(sides)
         self.tab_compare_part_loads.set_available_sides(sides)
 
