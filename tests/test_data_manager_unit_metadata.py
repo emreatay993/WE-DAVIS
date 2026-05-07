@@ -261,7 +261,60 @@ class DataManagerUnitMetadataTests(unittest.TestCase):
         self.assertEqual(unit_context["FREQ"].normalized_unit, "Hz")
         self.assertEqual(unit_context["Capitalized Channel T1"].normalized_unit, "mm")
 
+    def test_multi_folder_load_normalizes_repeated_spaces_in_interface_labels(self) -> None:
+        label = "I101-Fan_Frame/CC - Fan_Frame Side T1"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root_path = Path(temp_dir)
+            first_folder = root_path / "first"
+            second_folder = root_path / "second"
+            first_folder.mkdir()
+            second_folder.mkdir()
+
+            self._write_pld_files(
+                first_folder,
+                full_text="""
+                | NO | FREQ | Y1 | Y2 |
+                _______________________
+                | 1 | 10.0 | 1.00 | 0.00 |
+                """,
+                max_text="""
+                | Interface Label | UNIT | MAGNITUDE | PHASE(deg) | FREQ(Hz) |
+                _______________________________________________________________
+                | I101-Fan_Frame/CC - Fan_Frame Side   T1 | kN | 1.00 | 0.00 | 10.0 |
+                """,
+            )
+            self._write_pld_files(
+                second_folder,
+                full_text="""
+                | NO | FREQ | Y1 | Y2 |
+                _______________________
+                | 1 | 20.0 | 2.00 | 0.50 |
+                """,
+                max_text="""
+                | Interface Label | UNIT | MAGNITUDE | PHASE(deg) | FREQ(Hz) |
+                _______________________________________________________________
+                | I101-Fan_Frame/CC - Fan_Frame Side    T1 | kN | 2.00 | 0.50 | 20.0 |
+                """,
+            )
+
+            data, data_domain, _, unit_context = self._load_primary_folders([first_folder, second_folder])
+
+        self.assertEqual(data_domain, "FREQ")
+        self.assertIn(label, data.columns)
+        self.assertIn(f"Phase_{label}", data.columns)
+        self.assertNotIn("I101-Fan_Frame/CC - Fan_Frame Side   T1", data.columns)
+        self.assertNotIn("I101-Fan_Frame/CC - Fan_Frame Side    T1", data.columns)
+        self.assertEqual(list(unit_context), list(data.columns))
+        self.assertEqual(unit_context[label].normalized_unit, "kN")
+
+        values_by_folder = data.groupby("DataFolder")[label].first().to_dict()
+        self.assertEqual(values_by_folder, {"first": 1.0, "second": 2.0})
+
     def _load_primary_folder(self, folder: Path):
+        return self._load_primary_folders([folder])
+
+    def _load_primary_folders(self, folders: list[Path]):
         emitted = []
         failures = []
         self.data_manager.dataLoaded.connect(
@@ -271,7 +324,7 @@ class DataManagerUnitMetadataTests(unittest.TestCase):
         )
         self.data_manager.dataLoadFailed.connect(failures.append)
 
-        self.data_manager.load_data_from_paths([str(folder)])
+        self.data_manager.load_data_from_paths([str(folder) for folder in folders])
 
         self.assertFalse(failures, failures[0] if failures else None)
         self.assertEqual(len(emitted), 1)

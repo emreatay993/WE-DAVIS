@@ -183,7 +183,10 @@ class DataManager(QtCore.QObject):
         interface_units = []
         if 'Interface Label' in df.columns:
             metadata_rows = df[df['Interface Label'].notna()].copy()
-            interface_labels = metadata_rows['Interface Label'].astype(str).str.strip().tolist()
+            interface_labels = [
+                self._normalize_interface_label(value)
+                for value in metadata_rows['Interface Label'].tolist()
+            ]
             if 'UNIT' in metadata_rows.columns:
                 interface_units = [self._clean_header_value(value) for value in metadata_rows['UNIT'].tolist()]
             else:
@@ -249,6 +252,9 @@ class DataManager(QtCore.QObject):
             return None
         cleaned_value = str(value).strip()
         return cleaned_value or None
+
+    def _normalize_interface_label(self, value):
+        return re.sub(r'\s+', ' ', str(value).strip())
 
     def _parse_metadata_column(self, column_name):
         match = re.match(r'^(?P<label>[^()]+?)\s*\((?P<unit>[^()]+)\)\s*$', column_name.strip())
