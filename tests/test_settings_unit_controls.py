@@ -621,6 +621,51 @@ class MainWindowUnitStateTests(unittest.TestCase):
         )
         self.assertIn("Detected source units by quantity family", recorded_controls["summary_text"])
 
+    def test_primary_dataset_reload_retains_existing_unit_preferences(self) -> None:
+        harness, recorded_controls = self._build_harness()
+
+        initial_df = pd.DataFrame({"FREQ": [5.0], "Force_A": [10.0], "Phase_Force_A": [15.0]})
+        initial_context = {
+            "FREQ": ColumnUnitContext.from_source_unit("FREQ", "Hz"),
+            "Force_A": ColumnUnitContext.from_source_unit("Force_A", "kN"),
+            "Phase_Force_A": ColumnUnitContext.from_source_unit("Phase_Force_A", "deg", family_hint="phase"),
+        }
+        reloaded_df = pd.DataFrame(
+            {
+                "FREQ": [10.0],
+                "Force_A": [20.0],
+                "Displacement_A": [1.5],
+            }
+        )
+        reloaded_context = {
+            "FREQ": ColumnUnitContext.from_source_unit("FREQ", "Hz"),
+            "Force_A": ColumnUnitContext.from_source_unit("Force_A", "kN"),
+            "Displacement_A": ColumnUnitContext.from_source_unit("Displacement_A", "mm"),
+        }
+
+        harness._set_primary_dataset_state(initial_df, str(Path("first")), initial_context)
+        harness.apply_unit_preferences(
+            {"frequency": "kHz", "force": "N", "phase": "rad"},
+            SettingsTab.EXPORT_DISPLAY_UNITS,
+        )
+
+        harness._set_primary_dataset_state(reloaded_df, str(Path("second")), reloaded_context)
+        harness._refresh_settings_unit_controls()
+
+        self.assertEqual(
+            harness.active_display_units_by_family,
+            {"frequency": "kHz", "force": "N", "displacement": "mm"},
+        )
+        self.assertEqual(harness.export_unit_mode, SettingsTab.EXPORT_DISPLAY_UNITS)
+        self.assertEqual(harness.unit_context["FREQ"].display_unit, "kHz")
+        self.assertEqual(harness.unit_context["Force_A"].display_unit, "N")
+        self.assertEqual(harness.unit_context["Displacement_A"].display_unit, "mm")
+        self.assertEqual(recorded_controls["export_unit_mode"], SettingsTab.EXPORT_DISPLAY_UNITS)
+        self.assertEqual(
+            {control["family"]: control["selected_unit"] for control in recorded_controls["family_controls"]},
+            {"frequency": "kHz", "force": "N", "displacement": "mm"},
+        )
+
 
 class PlotControllerSettingsRefreshTests(unittest.TestCase):
     def test_update_all_plots_from_settings_uses_existing_settings_refresh_path(self) -> None:

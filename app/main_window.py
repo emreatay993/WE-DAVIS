@@ -232,12 +232,20 @@ class MainWindow(QMainWindow):
         for selector in selectors_to_block:
             selector.blockSignals(False)
 
-    def _derive_default_display_units(self, unit_context):
+    def _derive_default_display_units(self, unit_context, preferred_units_by_family=None):
         defaults = {}
+        preferred_units_by_family = preferred_units_by_family or {}
         for column_context in unit_context.values():
             if column_context.display_unit is None or column_context.quantity_family == "unknown":
                 continue
-            defaults.setdefault(column_context.quantity_family, column_context.display_unit)
+
+            preferred_unit = preferred_units_by_family.get(column_context.quantity_family)
+            selected_unit = (
+                preferred_unit
+                if preferred_unit in column_context.compatible_display_units
+                else column_context.display_unit
+            )
+            defaults.setdefault(column_context.quantity_family, selected_unit)
         return defaults
 
     def _apply_display_units_to_context(self, raw_context):
@@ -323,12 +331,21 @@ class MainWindow(QMainWindow):
         )
 
     def _set_primary_dataset_state(self, data, folder_path, unit_context):
+        previous_display_units = dict(self.active_display_units_by_family)
+        previous_export_unit_mode = self.export_unit_mode
+
         self.raw_primary_df = data.copy(deep=True)
         self.df = data
         self.raw_data_folder = folder_path
         self.raw_unit_context = dict(unit_context)
-        self.active_display_units_by_family = self._derive_default_display_units(self.raw_unit_context)
-        self.export_unit_mode = SettingsTab.EXPORT_SOURCE_UNITS
+        self.active_display_units_by_family = self._derive_default_display_units(
+            self.raw_unit_context,
+            preferred_units_by_family=previous_display_units,
+        )
+        if previous_export_unit_mode in {SettingsTab.EXPORT_SOURCE_UNITS, SettingsTab.EXPORT_DISPLAY_UNITS}:
+            self.export_unit_mode = previous_export_unit_mode
+        else:
+            self.export_unit_mode = SettingsTab.EXPORT_SOURCE_UNITS
         self._rebuild_display_unit_contexts()
         time_domain_tab = getattr(self, "tab_time_domain_represent", None)
         if time_domain_tab is not None:
