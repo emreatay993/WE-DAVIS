@@ -1,6 +1,7 @@
 # File: app/main_window.py
 
 import os
+import sys
 import pandas as pd
 
 from PyQt5 import QtWidgets, QtCore
@@ -21,6 +22,11 @@ from .controllers.plot_controller import PlotController
 from .controllers.action_handler import ActionHandler
 from .version import APP_DISPLAY_NAME
 from .utils.helpers import extract_part_side
+
+
+def _resource_path(*parts):
+    base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
+    return os.path.join(base_path, *parts)
 
 
 class MainWindow(QMainWindow):
@@ -77,7 +83,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         self._set_window_title()
         self.setMinimumSize(1200, 800)
-        icon_path = os.path.join("resources", "icons", "app_icon.ico")
+        icon_path = _resource_path("resources", "icons", "app_icon.ico")
         if os.path.exists(icon_path): self.setWindowIcon(QIcon(icon_path))
 
         # Menu Bar

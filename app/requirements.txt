@@ -5,6 +5,7 @@ numpy>=1.23
 scipy>=1.10
 plotly>=5.0
 natsort>=8.0
+setuptools>=70,<81
 endaq-calc>=1.4
 endaq-plot>=1.4
 # Optional for Ansys export automation

@@ -42,8 +42,13 @@ Adding New Tabs or Plots
 
 Packaging and Distribution
 
-- PyInstaller is present in requirements; for a basic one-file exe (no ANSYS):
-  pyinstaller --noconfirm --onefile --windowed --name WE-MechLoad-Viewer main.py
+- Build from the maintained spec:
+  .venv\Scripts\python -m PyInstaller --noconfirm WE-DAVIS.spec
+
+- If you use a basic one-file exe command instead of the spec (no ANSYS), keep the hidden import:
+  .venv\Scripts\python -m PyInstaller --noconfirm --onefile --windowed --hidden-import pkg_resources --name WE-MechLoad-Viewer main.py
+
+- setuptools must stay below 81 because PyInstaller 6.11 and some dependencies still expect pkg_resources.
 
 - For ANSYS-enabled workflows, ensure ansys-mechanical-core is installed on target and licensed; avoid bundling proprietary DLLs
 
