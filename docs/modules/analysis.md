@@ -1,110 +1,97 @@
-Analysis Module Reference
+# Analysis Module Reference
 
-app/analysis/data_processing.py
+## `app/analysis/data_processing.py`
 
-- apply_data_section(df, t_min_str, t_max_str) → DataFrame
-  - TIME only: returns df[(TIME >= t_min) & (TIME <= t_max)] if inputs valid; otherwise original df
+- `apply_data_section(df, t_min_str, t_max_str) -> DataFrame`
+  - For `TIME`, returns rows between min and max time when inputs are valid.
+- `apply_tukey_window(df, alpha) -> DataFrame`
+  - For `TIME`, applies a Tukey window to data columns while preserving domain,
+    `NO`, and `DataFolder` columns.
+- `apply_low_pass_filter(df, column, cutoff, order) -> DataFrame`
+  - For `TIME`, estimates sampling frequency from index spacing and applies a
+    Butterworth low-pass filter.
+- `compute_time_step_series(df) -> DataFrame`
+  - Computes robust time-step values from sorted `TIME` data.
+- `compute_sampling_rate_series(df) -> DataFrame`
+  - Computes sampling rate from time-step values.
+- `build_series_by_folder(...) -> dict[str, DataFrame]`
+  - Builds one plot frame per `DataFolder`, with optional `TIME` sectioning and
+    filtering.
+- `build_dt_by_folder(...)` and `build_fs_by_folder(...)`
+  - Build per-folder computed `Time Step (dt)` and `Sampling Rate (Hz)` frames.
+- `build_series_for_single(...) -> DataFrame`
+  - Builds one indexed frame for a single selected column.
+- `build_multi_series_for_single(...) -> DataFrame`
+  - Builds a multi-column single-folder frame with optional `TIME` sectioning and
+    Tukey windowing.
 
-- apply_tukey_window(df, alpha) → DataFrame
-  - TIME only: multiplies all data columns (excluding TIME/FREQ/NO/DataFolder) by scipy.signal.windows.tukey window
+## `app/analysis/steady_state_estimator.py`
 
-- apply_low_pass_filter(df, column, cutoff, order) → DataFrame
-  - TIME only: computes fs from index spacing; applies Butterworth low-pass to the selected column; returns original df on error
+- `estimate_cycles_to_steady_state(...) -> SteadyStateEstimate`
+  - Estimates startup-transient decay from damping ratio, excitation frequency,
+    optional dominant mode frequency, and residual fraction.
+  - The exact-resonance shorthand is `N = ln(1 / r) / (2 * pi * zeta)`.
+- `build_estimate_table(...) -> list[SteadyStateEstimate]`
+  - Builds common residual-fraction rows for the estimator dialog.
 
-- compute_time_step_series(df) → DataFrame
-  - Requires TIME; sorts by TIME, computes Δt with robustness to zero/near-zero steps; index named "Time [s]"
+The estimator is advisory. Soft-start smoothing improves load introduction but
+does not prove that fewer physical cycles are needed.
 
-- compute_sampling_rate_series(df) → DataFrame
-  - 1 / Δt; aligns index with compute_time_step_series
+## `app/analysis/steady_state_time_history_export.py`
 
-- build_series_by_folder(df, selected_col, data_domain, section_enabled=False, t_min_text='', t_max_text='', filter_enabled=False, cutoff_text='', filter_order=2) → dict[str, DataFrame]
-  - Groups by DataFolder (if present); prepares per-folder frames indexed by TIME or FREQ; optional sectioning and low-pass filter for TIME
+- `build_seconds_time_history_frame(...) -> DataFrame`
+  - Repeats a selected one-cycle waveform into a seconds-based transient load
+    history.
+- `apply_half_cosine_soft_start(...) -> DataFrame`
+  - Applies a one-sided half-cosine ramp to load/data columns only.
+  - Runs before unit conversion and CSV header generation.
+- `convert_time_history_frame_for_export(...) -> DataFrame`
+  - Converts export columns to selected dialog units where unit context is
+    available.
+- `build_time_history_csv_headers(...) -> list[str]`
+  - Adds selected unit labels to CSV headers without extra metadata rows.
 
-- build_dt_by_folder(df, section_enabled=False, t_min_text='', t_max_text='') → dict[str, DataFrame]
-  - Per-folder Δt series
+## `app/analysis/ansys_exporter.py`
 
-- build_fs_by_folder(df, section_enabled=False, t_min_text='', t_max_text='') → dict[str, DataFrame]
-  - Per-folder sampling rate series
+`AnsysExporter` encapsulates ANSYS Mechanical automation. It can be created with
+an explicit ANSYS version/base path or use its default session discovery path.
 
-- build_series_for_single(df, selected_col, data_domain, ... ) → DataFrame
-  - Single-folder helper to build one column with proper index and optional filter
+### Unit Model
 
-- build_multi_series_for_single(df, columns, data_domain, section_enabled=False, t_min_text='', t_max_text='', tukey_enabled=False, tukey_alpha=0.1) → DataFrame
-  - Multi-column single-folder builder with optional sectioning and Tukey (TIME)
+- `AnsysExportUnits` carries `domain_unit`, `force_unit`, `moment_unit`, and
+  `phase_unit`.
+- `_coerce_export_units(...)` accepts `None`, an `AnsysExportUnits` instance, or
+  a dict-like value and supplies domain defaults (`Hz` for `FREQ`, `s` for
+  `TIME`).
+- Quantity strings are normalized for ANSYS Mechanical through internal
+  `_to_quantity_unit(...)` handling.
 
-app/analysis/steady_state_estimator.py
+### Harmonic Export
 
-- estimate_cycles_to_steady_state(damping_ratio, excitation_frequency_hz, mode_frequency_hz=None, residual_fraction=0.01) → SteadyStateEstimate
-  - Estimates startup-transient decay using the damped modal envelope q_tr(t) ~ exp(-zeta * omega_n * t)
-  - General estimate: t_required = ln(1 / r) / (zeta * omega_n), then N_cycles = f_exc * t_required
-  - Exact-resonance shorthand: N = ln(1 / r) / (2*pi*zeta)
-  - Example: zeta = 0.02 and r = 0.01 gives N = 36.65, rounded up to 37 whole cycles
-  - The estimate remains conservative; soft-start smoothing can help load introduction and convergence but is not a guaranteed cycle-count reducer
+- `create_harmonic_template(df_export, data_domain, export_units=None)`
+  - Requires `FREQ`.
+  - Uses magnitude columns plus matching `Phase_...` columns.
+  - Builds real/imaginary APDL tables for force and moment components.
+  - Saves `WE_Loading_Template_Harmonic.mechdat`.
 
-- build_estimate_table(...) → list[SteadyStateEstimate]
-  - Builds common residual-fraction rows for the estimator dialog
+### Transient Export
 
-app/analysis/steady_state_time_history_export.py
+- `create_transient_template(df_export, data_domain, export_units=None)`
+  - Requires `TIME`.
+  - Uses the selected time/domain unit from `export_units`.
+  - Partitions large load tables for Mechanical load input.
+  - Saves `WE_Loading_Template_Transient.mechdat`.
 
-- build_seconds_time_history_frame(one_cycle_plot_data, interval_degrees, cycles, frequency_hz) → DataFrame
-  - Repeats the selected steady-state one-cycle waveform into a seconds-based transient load history with an inclusive endpoint
+### APDL and Partition Helpers
 
-- apply_half_cosine_soft_start(frame, ramp_cycles, frequency_hz, time_column="Time") → DataFrame
-  - Applies m(t) = 0.5 * (1 - cos(pi * t / T_ramp)) for 0 <= t < T_ramp, then 1.0
-  - Multiplies load/data columns only and never the time column
-  - Runs before unit conversion and CSV header generation in the export dialog
-  - Prevents a steady-state waveform from being introduced as an artificial initial load step when the downstream transient model starts from zero state
-  - Uses a one-sided half-cosine ramp instead of the existing full Tukey window because this export needs to end at full steady-state amplitude; the Tukey window remains the two-sided taper for extracted TIME sections and signal-processing boundary control
+- `_create_APDL_table(...) -> list[str]`
+  - Generates APDL table commands.
+- `_partition_dataframe_for_load_input(...) -> list[DataFrame]`
+  - Splits large transient tables and inserts continuity rows where needed.
 
-- convert_time_history_frame_for_export(...) → DataFrame
-  - Converts non-time columns to the selected export units where unit context is known
+## Unit-Aware Export Behavior
 
-- build_time_history_csv_headers(...) → list[str]
-  - Adds selected unit labels to CSV headers without adding metadata rows
-
-References used by this implementation:
-
-- ANSYS Help: Harmonic Response.
-- ANSYS Help: Mode-Superposition Transient Dynamic Analysis.
-- [ANSYS Mechanical APDL Basic Analysis Guide, Release 2025 R2, Chapter 3 Loading, Section 3.4 Ramped and Stepped Loads, PDF p. 26](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/pdf/ANSYS_Mechanical_APDL_Basic_Analysis_Guide.pdf).
-- [ANSYS Mechanical APDL Structural Analysis Guide, Release 2025 R2, Chapter 5 Transient Dynamic Analysis, Section 5.3.2 Establish Initial Conditions, PDF p. 156](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/pdf/ANSYS_Mechanical_APDL_Structural_Analysis_Guide.pdf).
-- [ANSYS Mechanical APDL Theory Reference, Release 2025 R2, Chapter 15.2 Transient Analysis](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_thry/thy_anproc2.html).
-- [ANSYS Mechanical User's Guide, Release 2025 R1, Section 5.12 Transient Structural Analysis](https://ansyshelp.ansys.com/public/Views/Secured/corp/v251/en/wb_sim/ds_transient_mechanical_analysis_type.html).
-- [ANSYS Multibody Analysis Guide, Release 2025 R2, Chapter 3.3 Initial Conditions](https://ansyshelp.ansys.com/public/Views/Secured/corp/v252/en/ans_mul/Hlp_G_MULINITCOND.html).
-- [SciPy v1.14.1 scipy.signal.windows.tukey reference, citing Harris 1978 for tapered-cosine window background](https://docs.scipy.org/doc/scipy-1.14.1/reference/generated/scipy.signal.windows.tukey.html).
-
-app/analysis/ansys_exporter.py
-
-- AnsysExporter
-  - _init_ansys_session()/_close_ansys_session(): lifecycle of ansys.mechanical.core App and globals (Model, ExtAPI, DataModel, Quantity, Ansys)
-
-  - create_harmonic_template(df_export, data_domain)
-    - Expects FREQ; builds per-interface loads: forces (T1–T3) and moments (R1–R3) with phase columns (Phase_T1…)
-    - Creates APDL tables for real/imag components via _create_APDL_table
-    - Adds RemoteForce and (optionally) Moment to Harmonic analysis; cleans temp files; saves WE_Loading_Template_Harmonic.mechdat
-
-  - create_transient_template(df_export, data_domain, sample_rate)
-    - Expects TIME; builds per-interface force/moment tables over TIME
-    - Partitions large inputs into segments of ~50k rows; assigns to Transient analysis loads
-    - Python post hook to clean working directory; saves WE_Loading_Template_Transient.mechdat
-
-  - _create_APDL_table(result_df, table_name, data_domain) → list[str]
-    - Generates *DIM and *SET commands for APDL tables
-
-  - _partition_dataframe_for_load_input(df, partition_size) → list[DataFrame]
-    - Partitions with inserted zero rows and previous last-row zero to ensure continuity
-
-Notes and Units
-
-- Scaling: exporter uses kN and kN·m by assembling Quantity objects; data is multiplied by 1000 where needed before writing CSVs by ActionHandler
-- Domain: harmonic template only for FREQ (requires Phase_); transient only for TIME; the ActionHandler selects which to call
-
-
-
-
-
-
-
-
-
-
+`ActionHandler` now prepares export frames and validates unit families before
+calling `AnsysExporter`. The old documentation that described fixed kN/kN-m
+scaling or explicit `sample_rate` arguments is stale; current calls pass
+`export_units` and let the exporter use the resolved domain unit.

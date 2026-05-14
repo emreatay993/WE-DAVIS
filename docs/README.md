@@ -1,51 +1,52 @@
-WE MechLoad Viewer
+# WE-DAVIS Documentation
 
-Overview
+WE-DAVIS is a PyQt5 desktop application for exploring WE Davis mechanical load
+`.pld` exports, comparing runs, reconstructing frequency-domain loads into
+time histories, and preparing unit-aware CSV/ANSYS handoff data.
 
-- Desktop application to explore and export mechanical load data from .pld files.
-- Built with PyQt5 for UI and Plotly for interactive plots.
-- Supports frequency-domain (FREQ) and time-domain (TIME) datasets; comparison workflows; ANSYS Mechanical export.
+## Quickstart
 
-Key Features
+```powershell
+python -m venv venv
+venv\Scripts\activate
+python -m pip install -r requirements.txt
+python main.py
+```
 
-- Load one or multiple data folders containing full.pld and max.pld.
-- Automatic domain detection (FREQ or TIME) and header mapping from max.pld.
-- Tabs for Single Data, Interface Data, Part Loads, Time-Domain Representation (FREQ only), Comparison, and Settings.
-- Optional time-domain tools: sectioning, low-pass filtering, Tukey window, rolling min-max envelope.
-- Export full combined dataset to CSV; export part loads to ANSYS templates (harmonic/transient).
+On first launch, select a folder containing one or more `*full.pld` data files
+and a `*max.pld` header file. Suffix matching is case-insensitive. Repository
+samples are available under `resources/sample_data/`.
 
-Quickstart
+## Key Features
 
-1. Install Python 3.12 on Windows.
-2. Create and activate a virtual environment.
-3. Install dependencies:
-   pip install -r requirements.txt
-4. Run the app:
-   python main.py
-5. On first launch, select a dataset folder whose filenames end with full.pld and max.pld. Bundled samples are available under resources/sample_data/.
+- Load single-folder or multi-folder `TIME`/`FREQ` datasets.
+- Preserve `DataFolder` provenance across merged folders.
+- Track source units from headers, choose display units in Settings, and choose
+  source-unit or display-unit export mode for extracted/ANSYS CSV workflows.
+- Plot single channels, interfaces, part loads, comparisons, spectra, rolling
+  envelopes, and frequency-to-time reconstructions.
+- Export full data, sampled reconstructed cycles, repeated steady-state
+  histories with optional soft start, and ANSYS Mechanical templates.
 
-Data Requirements
+## High-Level Workflow
 
-- Each selected folder must include:
-  - a file ending with full.pld: numeric data (TIME or FREQ column present).
-  - a file ending with max.pld: header file used to derive interface/channel names.
+1. `DataManager` validates PLD folders, builds the combined DataFrame and unit
+   context map, then emits `dataLoaded(df, domain, first_folder, unit_context)`.
+2. `MainWindow` stores raw/display state, populates selectors, adjusts tab
+   availability, refreshes unit controls, and delegates plot refreshes.
+3. `PlotController` builds plot-ready frames in display units and passes figures
+   to `Plotter`/tab display methods.
+4. `ActionHandler` coordinates comparison loading, reconstructed CSV extraction,
+   steady-state dialogs, and ANSYS export.
 
-High-Level Workflow
+## Documentation Map
 
-- DataManager loads and validates folders → emits dataLoaded(df, domain, folder).
-- MainWindow receives data, wires UI state, and delegates plotting to PlotController.
-- PlotController builds DataFrames for Plotter, which returns Plotly figures.
-- ActionHandler coordinates comparison data selection, time-domain CSV extraction, and ANSYS export.
-
-Where To Go Next
-
-- User v0.9 showcase: docs/WE-DAVIS_v0.9_User_Showcase.md
-- Recent changelog: docs/CHANGELOG_2026-04-21.md
-- Architecture: docs/Architecture.md
-- Data flow and signals: docs/DataFlow-and-Signals.md
-- UI guide: docs/UI-Guide.md
-- Plotting API: docs/Plotting.md
-- Modules reference: docs/modules/*.md
-
-
-
+- `docs/Architecture.md`: code structure and component responsibilities.
+- `docs/DataFlow-and-Signals.md`: data path and Qt signal/slot map.
+- `docs/Developer-Guide.md`: environment, run, test, and packaging commands.
+- `docs/UI-Guide.md`: user-facing tab behavior.
+- `docs/Config-and-Settings.md`: settings and export-unit behavior.
+- `docs/Plotting.md`: Plotly rendering service notes.
+- `docs/modules/*.md`: focused module references.
+- `app/ARCHITECTURE.md`, `app/FILE_INDEX.md`, `app/SIGNAL_SLOT_REFERENCE.md`:
+  app-local implementation references.

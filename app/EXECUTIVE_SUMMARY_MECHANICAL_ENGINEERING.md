@@ -1,10 +1,24 @@
-# Executive Summary (Mechanical Engineering)
+# Executive Summary for Mechanical Engineering
 
-WE MechLoad Viewer was built around the daily workflow of drivetrain and structural analysts:
+WE-DAVIS supports drivetrain and structural analysts who need a fast path from
+test-bench PLD exports to review plots and simulation-ready load inputs.
 
-- **Rapid Load Validation**: Import raw `.pld` exports directly from the test bench, validate completeness, and spot-check interface loads before results leave the lab.
-- **Frequency vs Time Domain Support**: Inspect harmonic content (magnitude and phase) or time histories with equal ease. Time-domain tooling includes windowing, low-pass filtering, and Δt / sampling-rate diagnostics to confirm data fidelity.
-- **Side-by-Side Comparisons**: Overlay new runs versus baselines, quantify absolute and percent deltas, and isolate side-specific differences across T1/T2/T3 and R1/R2/R3 components.
-- **Simulation-Ready Outputs**: Generate CSV extracts for ad hoc analysis and automatically populate Ansys Mechanical harmonic or transient templates, complete with remote points and load schedules.
+- **Rapid load validation**: Load one or more PLD folders, preserve source
+  folder provenance, and inspect individual channels, interfaces, and part
+  loads without writing scripts.
+- **Frequency and time-domain support**: Review harmonic magnitude/phase data or
+  time histories. Time-domain tooling includes sectioning, low-pass filtering,
+  Tukey windows, time-step diagnostics, sampling-rate diagnostics, and rolling
+  envelopes.
+- **Unit-aware review**: Track source units from headers, switch display units
+  by quantity family, and choose source-unit or display-unit export behavior.
+- **Comparison workflows**: Overlay primary and comparison data, quantify
+  absolute/relative deltas, and use phase-aware complex differences for
+  frequency-domain load comparisons where phase columns are available.
+- **Simulation handoff**: Export unit-aware CSV files, repeated steady-state
+  time histories with optional soft start, and ANSYS Mechanical harmonic or
+  transient templates.
 
-Mechanical engineers can now close the loop from instrumentation to simulation without writing custom scripts, reducing turnaround time on correlation studies and regression checks.
+The current architecture keeps loading, plotting, unit handling, export actions,
+and UI widgets separated so engineering workflows can evolve without forcing a
+full rewrite.

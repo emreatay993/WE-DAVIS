@@ -1,35 +1,24 @@
-Architecture
+# Architecture
 
-Directory Structure
+WE-DAVIS is a PyQt5 desktop application with Plotly-backed chart rendering. The
+current structure is deliberately simple: `MainWindow` owns composition and
+state, `DataManager` owns loading, controllers own slots, and analysis/unit
+modules provide services.
 
-- app/
-  - analysis/: domain-specific processing and export logic
-    - data_processing.py: sectioning, Tukey window, low-pass filter, builders for plot-ready DataFrames
-    - ansys_exporter.py: ANSYS Mechanical integration; harmonic/transient template generation
-  - controllers/: UI orchestration and business logic
-    - plot_controller.py: builds plot data, responds to UI, manages computed metrics and comparisons
-    - action_handler.py: long-running/complex user actions (comparison load, CSV extraction, ANSYS export)
-  - plotting/: figure construction
-    - plotter.py: Plotly figure factory, common styling, spectrum and envelope plots
-  - ui/: PyQt5 widgets (tabs and dock)
-    - directory_tree_dock.py: folder selection dock, emits directories_selected
-    - tab_*.py: tab widgets for data exploration and settings
-  - config_manager.py: QSS styles and button styles
-  - data_manager.py: data I/O, validation, header mapping, signals
-  - main_window.py: composition root, signal wiring, top-level state
-  - tooltips.py: HTML tooltips
-- main.py: application bootstrap
-- scripts/: utilities and diagnostics
-  - test_dt.py: robust Δt computation sampler for TIME data
+## Directory Structure
 
-Code Tree (ASCII)
-
-```
+```text
 WE-DAVIS/
+  main.py
+  requirements.txt
+  WE-DAVIS.spec
   app/
     analysis/
       ansys_exporter.py
       data_processing.py
+      steady_state_estimator.py
+      steady_state_time_history_export.py
+      v0/resonance_steady_state_cycles_gui.py
     controllers/
       action_handler.py
       plot_controller.py
@@ -37,6 +26,8 @@ WE-DAVIS/
       plotter.py
     ui/
       directory_tree_dock.py
+      steady_state_cycle_estimator_dialog.py
+      steady_state_time_history_export_dialog.py
       tab_compare_data.py
       tab_compare_part_loads.py
       tab_interface_data.py
@@ -44,88 +35,93 @@ WE-DAVIS/
       tab_settings.py
       tab_single_data.py
       tab_time_domain_represent.py
+      widgets/checkable_combo_box.py
+    units/
+      catalog.py
+      context.py
+      conversion.py
+      errors.py
     utils/
       helpers.py
     config_manager.py
     data_manager.py
     main_window.py
     tooltips.py
+    version.py
   resources/
-    icons/
-      app_icon.ico
-  scripts/
-    test_dt.py
-  full_data.csv
-  main.py
-  requirements.txt
+    icons/app_icon.ico
+    sample_data/
+  tests/
 ```
 
-Key Responsibilities
+## Component Responsibilities
 
-- DataManager
-  - Opens folder dialogs, validates presence of full.pld and max.pld
-  - Reads .pld files into pandas, infers domain (TIME/FREQ)
-  - Derives column headers from max.pld; inserts Phase_ columns for FREQ
-  - Emits dataLoaded(df, domain, first_folder) and comparisonDataLoaded(df)
+- `main.py`: starts Qt, creates `DataManager` and `MainWindow`, and schedules
+  the initial folder dialog.
+- `app/main_window.py`: composition root. Owns top-level state, raw/display unit
+  contexts, menu actions, tabs, dock, selector population, tab visibility, and
+  signal wiring.
+- `app/data_manager.py`: loads PLD folders, matches `*full.pld` and `*max.pld`
+  files, detects `TIME`/`FREQ`, builds `ColumnUnitContext` maps, and emits data
+  signals.
+- `app/controllers/plot_controller.py`: plot-refresh slot owner. Converts data
+  to display units, builds plot-ready frames, computes comparisons, and updates
+  tabs.
+- `app/controllers/action_handler.py`: action workflow owner. Handles comparison
+  selection, reconstructed CSV extraction, steady-state dialogs, part-load CSV
+  export, ANSYS version/path selection, unit validation, and exporter calls.
+- `app/analysis/data_processing.py`: pure DataFrame transforms for sectioning,
+  Tukey windows, filters, computed time metrics, and plot builders.
+- `app/analysis/ansys_exporter.py`: ANSYS Mechanical harmonic/transient template
+  generation using validated `AnsysExportUnits`.
+- `app/analysis/steady_state_estimator.py`: damping-based cycle/time estimates.
+- `app/analysis/steady_state_time_history_export.py`: repeated-cycle time
+  history frame generation, soft-start ramping, unit conversion, and CSV headers.
+- `app/units/*`: unit aliases, family inference, display contexts, conversion,
+  and unit errors.
+- `app/plotting/plotter.py`: Plotly figure factories and `QWebEngineView`
+  loading.
+- `app/ui/*`: Qt widgets and dialogs. Tabs expose signals and display methods;
+  they do not own data loading or export orchestration.
 
-- MainWindow
-  - Holds application state: df, df_compare, data_domain, raw_data_folder
-  - Configures menus, dock, tabs; applies QSS from config_manager
-  - Routes UI signals to PlotController and ActionHandler
-  - Adjusts tab availability based on number of data folders and domain
+## Data Model
 
-- PlotController
-  - Builds plot-ready DataFrames using analysis.data_processing helpers
-  - Manages computed selections in TIME: Time Step (Δt), Sampling Rate (Hz)
-  - Drives Single Data, Interface Data, Part Loads, Time Domain Represent, Compare Data, Compare Part Loads tabs
-  - Computes absolute/relative differences for comparison workflows; handles complex difference in FREQ with phase
+The combined primary DataFrame includes:
 
-- ActionHandler
-  - Opens comparison-data selection; triggers DataManager.load_comparison_data
-  - Exports time-domain reconstructed samples to CSV from TimeDomainRepresentTab
-  - Prepares data subsets and invokes AnsysExporter for harmonic/transient templates
+- `NO` when present.
+- One domain column: `TIME` or `FREQ`.
+- Measurement columns from PLD header labels.
+- `Phase_...` columns for frequency-domain phase data.
+- `DataFolder` to identify the source folder for merged runs.
 
-- Plotter
-  - Standard figure creation for single/multi series and comparison
-  - Spectrum from rolling FFT (endaq.calc) and rolling min-max envelope (endaq.plot)
-  - Centralized styling: legend, hover, fonts, opacity, positions
+The unit context map is keyed by column name. It stores source unit,
+normalized unit, quantity family, compatible display units, active display unit,
+and whether the source unit is native-only.
 
-- analysis.data_processing
-  - Core transforms: sectioning, Tukey window, low-pass filter (Butterworth)
-  - Computed metrics: Δt series, sampling rate series
-  - Builders returning dict[str, DataFrame] per DataFolder or single DataFrame
+## Domain Behavior
 
-- analysis.ansys_exporter
-  - Starts ansys.mechanical.core App; accesses global objects
-  - Builds loads over frequency/time, real/imag components for harmonic, partitions for transient
-  - Saves .mechdat and cleans up temp folders/files; shows completion dialogs
+- `FREQ`: phase plot support, Time Domain Representation tab, one-cycle
+  reconstruction, steady-state repeated-cycle export, and harmonic ANSYS export.
+- `TIME`: sectioning, low-pass filter, Tukey window, spectrum views, rolling
+  min/max envelope, computed `Time Step (dt)` and `Sampling Rate (Hz)`, and
+  transient ANSYS export.
 
-Data Model
+## Signals and Ownership
 
-- Combined DataFrame (df):
-  - Mandatory domain column: FREQ or TIME
-  - Optional NO; Many measurement columns like: I1 - Left (T1), I1 - Left (R1), etc.
-  - For FREQ domain: matching Phase_ columns for each magnitude column
-  - DataFolder: basename of source folder to support multi-folder grouping
+- `DataManager -> MainWindow`: `dataLoaded`, `dataLoadFailed`,
+  `comparisonDataLoaded`, and `loadingProgress`.
+- `Tabs -> PlotController`: plot/settings change signals.
+- `Tabs/MainWindow -> ActionHandler`: comparison selection, CSV extraction,
+  steady-state dialogs, and ANSYS export.
+- `MainWindow`: central signal wiring and tab refresh routing.
 
-Domain-Driven Behavior
+See `docs/DataFlow-and-Signals.md` and `app/SIGNAL_SLOT_REFERENCE.md` for the
+full signal map.
 
-- FREQ
-  - Phase plots enabled in Single Data (single-folder only)
-  - Time Domain Represent tab visible; reconstructs y(θ) = A cos(θ − φ)
-  - ANSYS: Harmonic template via phase-aware loads
+## Verification
 
-- TIME
-  - Sectioning, low-pass filter, Tukey available where applicable
-  - Computed selections: Time Step (Δt), Sampling Rate (Hz)
-  - Rolling min-max envelope option across plots
-  - ANSYS: Transient template with partitioned load tables
+The current automated suite is under `tests/` and uses stdlib `unittest`:
 
-Signals and Ownership
-
-- DataManager → MainWindow: dataLoaded, comparisonDataLoaded
-- Tabs → PlotController: plot_parameters_changed (per tab), spectrum_parameters_changed (SingleData)
-- Tabs → ActionHandler: export and compare selection requests
-- MainWindow orchestrates signal connections and selector population after data loads
-
-
+```powershell
+python -m unittest discover -s tests -p "test_*.py"
+```

@@ -1,86 +1,102 @@
-Developer Guide
+# Developer Guide
 
-Environment
+## Environment
 
-- OS: Windows 10/11 recommended (ANSYS integration is Windows-centric)
-- Python: 3.12 (matches venv in repo)
-- GUI: PyQt5 + PyQtWebEngine; plotting via Plotly
+- OS: Windows 10/11 recommended. ANSYS integration is Windows-centric.
+- Python: 3.12.
+- GUI stack: PyQt5 and PyQtWebEngine.
+- Plotting/data stack: Plotly, pandas, numpy, scipy, endaq, natsort.
+- Optional integration: `ansys-mechanical-core` for ANSYS Mechanical automation.
 
-Setup
+## Setup
 
-1. Create venv and install dependencies
-   python -m venv venv
-   venv\Scripts\activate
-   pip install -r requirements.txt
+Run from the repository root:
 
-2. Run the app
-   python main.py
+```powershell
+python -m venv venv
+venv\Scripts\activate
+python -m pip install -r requirements.txt
+```
 
-3. First-run data selection
-   - A dialog will ask for a dataset folder containing files whose names end with full.pld and max.pld
-   - Bundled samples are available under resources/sample_data/
+Use the root `requirements.txt` for reproducible development and packaging.
+`app/requirements.txt` is a looser runtime manifest.
 
-Coding Conventions
+## Run
 
-- Prefer explicit, descriptive names for UI widgets and options
-- Keep domain logic in analysis/ and orchestration in controllers/
-- Plot-ready DataFrames must have index set to TIME or FREQ with human-friendly index name
-- Avoid catching broad exceptions unless presenting user feedback; return safe defaults (empty DataFrame/figure) when appropriate
+```powershell
+python main.py
+```
 
-Data Contracts
+On startup, choose a dataset folder containing one or more files ending in
+`full.pld` and one header file ending in `max.pld`. Matching is
+case-insensitive. Repository samples live under `resources/sample_data/`.
 
-- TIME domain: 'TIME' column present; sectioning, low-pass, Tukey available
-- FREQ domain: 'FREQ' column present; corresponding 'Phase_' columns expected for magnitude columns
-- Combined df includes 'DataFolder' to separate multi-folder series
+## Test
 
-Adding New Tabs or Plots
+The current automated suite uses stdlib `unittest`:
 
-- Create a new widget under app/ui/
-- Expose a plot_parameters_changed signal when options change
-- Add display_* methods to load Plotly figures via load_fig_to_webview
-- Extend PlotController with snapshot and update_* methods; wire signals in MainWindow._connect_signals
+```powershell
+python -m unittest discover -s tests -p "test_*.py"
+```
 
-Packaging and Distribution
+The suite covers unit contracts, PLD metadata loading, plot unit projection,
+settings unit controls, export unit modes, and steady-state time-history export
+helpers. `scripts/test_dt.py` remains a diagnostic utility for time-step
+experiments, not the main test suite.
 
-- Build from the maintained spec:
-  .venv\Scripts\python -m PyInstaller --noconfirm WE-DAVIS.spec
+## Packaging
 
-- If you use a basic one-file exe command instead of the spec (no ANSYS), keep the hidden import:
-  .venv\Scripts\python -m PyInstaller --noconfirm --onefile --windowed --hidden-import pkg_resources --name WE-MechLoad-Viewer main.py
+Build from the maintained PyInstaller spec:
 
-- setuptools must stay below 81 because PyInstaller 6.11 and some dependencies still expect pkg_resources.
+```powershell
+python -m PyInstaller --noconfirm WE-DAVIS.spec
+```
 
-- For ANSYS-enabled workflows, ensure ansys-mechanical-core is installed on target and licensed; avoid bundling proprietary DLLs
+The spec builds from `main.py`, names the executable `WE-DAVIS`, hides the
+console, includes `resources/icons/app_icon.ico`, and keeps `pkg_resources` as a
+hidden import. The current spec does not include `resources/sample_data/`.
 
-Testing Notes
+`setuptools` is pinned in the root requirements because PyInstaller and some
+dependencies still expect `pkg_resources`.
 
-- Use scripts/test_dt.py to verify robust Δt computation on TIME datasets
-- Manual smoke tests:
-  - Load one of the bundled sample folders under resources/sample_data/
-  - Load single TIME folder → verify computed selections, spectrum, envelope
-  - Load single FREQ folder → verify phase plot and Time Domain Represent
-  - Load additional folders from dock → verify multi-folder selectors and legends
-  - Comparison flows for both domains
-  - ANSYS export (on a machine with ANSYS)
+## Coding Conventions
 
-Troubleshooting
+- Keep top-level wiring and state in `MainWindow`.
+- Keep data loading and unit-context creation in `DataManager`.
+- Keep plot-refresh behavior in `PlotController`.
+- Keep cross-tab workflows and side effects in `ActionHandler`.
+- Keep reusable transforms in `app/analysis/` and reusable unit logic in
+  `app/units/`.
+- Tabs should expose signals and `display_*` methods rather than performing data
+  loading, export, or plotting orchestration themselves.
+- Prefer explicit source/display/export unit handling when adding new workflows.
 
-- QtWebEngine issues: ensure PyQtWebEngine matches PyQt5 version in requirements
-- Missing Phase_ columns: confirm max.pld contains headers; DataManager creates Phase_ labels only for FREQ
-- Large datasets: use Rolling Min-Max envelope and limit points to keep UI responsive
+## Data Contracts
 
+- `TIME` domain requires a `TIME` column. It enables sectioning, low-pass
+  filtering, Tukey windows, spectrum views, time-step/sampling-rate computed
+  selectors, and transient export.
+- `FREQ` domain requires a `FREQ` column and uses matching `Phase_...` columns
+  for phase plots, comparison math, reconstruction, and harmonic export.
+- Combined frames include `DataFolder` for multi-folder grouping.
+- Unit metadata is carried as `ColumnUnitContext` objects keyed by column name.
 
+## Manual Smoke Checks
 
+- Load `resources/sample_data/frequency_sample/`.
+- Load `resources/sample_data/time_transient_sample/`.
+- Verify Settings-tab display-unit selectors and export-unit mode.
+- For `TIME`, verify sectioning/filtering/spectrum/rolling envelope controls.
+- For `FREQ`, verify phase plot, Time Domain Representation, cycle estimator,
+  and steady-state time-history export dialog.
+- Compare two compatible datasets.
+- On an ANSYS machine, verify harmonic and transient export paths.
 
+## Troubleshooting
 
-
-
-
-
-
-
-
-
-
-
-
+- QtWebEngine failures usually indicate PyQt5/PyQtWebEngine version mismatch.
+- Missing phase behavior usually means the loaded frequency columns lack matching
+  `Phase_...` columns.
+- Unknown or native-only units can be displayed but cannot be converted until
+  mapped to a supported quantity family.
+- Large datasets can block the UI because loading and plotting are synchronous.

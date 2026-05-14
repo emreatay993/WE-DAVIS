@@ -1,32 +1,50 @@
-# Refactoring Progress & Opportunities
+# Refactoring Progress and Opportunities
 
 ## Current State
-- Core modules (`data_manager`, `main_window`, `controllers`, `analysis`, `plotting`, `ui`) are functionally organized but lack automated tests.
-- Documentation now covers architecture, onboarding, and operations, reducing tribal knowledge risk.
-- The plotting pipeline centralizes logic in `PlotController`, minimizing duplication across tabs.
+
+- Core responsibilities are separated across `DataManager`, `MainWindow`,
+  controllers, analysis helpers, plotting, UI widgets, and unit services.
+- Automated `unittest` coverage exists under `tests/` for unit contracts, PLD
+  metadata loading, plotting unit projection, settings unit controls, export
+  unit modes, and steady-state time-history export helpers.
+- `utils/helpers.py` now contains shared PLD label parsing helpers used by
+  controllers and the main window.
+- Documentation covers architecture, file inventory, data/signals, setup,
+  settings, and module references.
 
 ## Low-Hanging Improvements
-1. **Graceful Initial Cancel**  
-   `DataManager.load_data_from_directory()` calls `sys.exit(1)` when the first dialog is canceled. Replace with a user-friendly prompt so accidental cancels do not close the app.
-2. **Utility Consolidation**  
-   Several regex helpers live inline within controllers. Move them to `utils/helpers.py` (currently empty) to improve reuse and testability.
-3. **Configurable File Patterns**  
-   Hard-coded `full.pld` and `max.pld` suffixes could move to a config module, enabling support for alternate data exports without code changes.
+
+1. **Graceful Initial Cancel**
+   `DataManager.load_data_from_directory()` still calls `sys.exit(1)` when the
+   first startup folder dialog is canceled. Replace it with a soft failure path.
+2. **Background Loading**
+   Large PLD loads and expensive plot rebuilds run synchronously on the UI
+   thread. Move ingestion and long plot operations toward worker threads or
+   `QtConcurrent`.
+3. **Configurable File Patterns**
+   `full.pld` and `max.pld` suffixes are hard-coded. Centralize them if
+   alternate export naming becomes common.
 
 ## Medium-Term Targets
-1. **Plot Reuse & Caching**  
-   Recompute-heavy tabs (especially spectrum plots) rebuild entire DataFrames on each interaction. Introduce memoization keyed by DataFrame hash + tab options to improve responsiveness on large datasets.
-2. **Comparison Workflow**  
-   The comparison feature recalculates differences column by column. Refactor into vectorized utilities with clearer error handling and support for time alignment (if sample counts diverge).
-3. **Windowing & Filtering API**  
-   Expand `analysis/data_processing.py` into a mini pipeline builder (compose sectioning, filtering, averaging). This will simplify future feature requests (e.g., RMS, peak hold).
+
+1. **Plot Reuse and Caching**
+   Cache expensive intermediate frames/figures by DataFrame identity plus tab
+   settings, especially for spectrum and large multi-folder plots.
+2. **Comparison Alignment**
+   Comparison logic assumes compatible shapes/indexes. Add explicit alignment
+   policies for diverging sample counts or time/frequency grids.
+3. **Processing Pipeline API**
+   Sectioning, filtering, Tukey, and future metrics could move into a composed
+   processing pipeline to keep controller methods smaller.
 
 ## Long-Term Considerations
-1. **Automated Tests**  
-   Introduce headless tests for `DataManager` (using fixture `.pld` files) and unit tests for data-processing helpers. Consider Qt Test or pytest-qt for UI signal coverage.
-2. **Plugin-Based Exports**  
-   `AnsysExporter` is tightly coupled to one downstream tool. Abstract exports into a strategy pattern so new formats (e.g., Abaqus, CSV templates) can plug in without modifying the tab.
-3. **Asynchronous Loading**  
-   Large datasets block the UI thread. Evaluate worker threads or Qt's `QtConcurrent` for background ingestion with progress feedback.
 
-Documenting these opportunities clarifies where to focus future engineering cycles once feature development resumes.
+1. **Async ANSYS Export Feedback**
+   ANSYS template generation can be slow. Add progress and cancellation support
+   around exporter calls.
+2. **Export Strategy Interfaces**
+   `AnsysExporter` is tightly coupled to one downstream tool. A strategy
+   interface would make Abaqus/custom CSV templates easier to add.
+3. **Headless UI Signal Tests**
+   Unit tests cover services and contracts. Add targeted Qt signal tests for tab
+   wiring and selector behavior when the test environment supports it.

@@ -1,55 +1,78 @@
-Configuration and Settings
+# Configuration and Settings
 
-Style Configuration (QSS)
+## Style Configuration
 
-- config_manager.py defines application styles:
-  - TREEVIEW_STYLE: dock tree view background, selection colors
-  - TABWIDGET_STYLE: tab colors, rounded corners, pane borders
-  - GROUPBOX_STYLE: group colors and border radius in Settings tab
-  - COMPARE_BUTTON_STYLE: primary button used in CompareDataTab
+`app/config_manager.py` centralizes QSS constants for:
 
-Runtime Settings (SettingsTab)
+- dock/tree styling;
+- tab widget styling;
+- group box styling;
+- compare/action button styling;
+- reusable `CheckableComboBox` styling.
 
-- Graphical Settings
-  - Legend Font Size: updates Plotter.legend_font_size
-  - Default Font Size: updates Plotter.default_font_size
-  - Hover Font Size: updates Plotter.hover_font_size
-  - Hover Mode: closest/x/y/x unified/y unified → Plotter.hover_mode
-  - Trace Opacity: global opacity for all traces → Plotter.trace_opacity
+`app/tooltips.py` stores shared tooltip copy used by plotting and export
+controls.
 
-- Data Processing Tools (TIME domain)
-  - Rolling Min-Max Envelope (beta):
-    - When enabled in TIME domain, Single Data plots render via Plotter.create_rolling_envelope_figure
-    - Depends on Desired Number of Points and Plot as Bars toggle
-  - Visibility of dependent controls is managed by SettingsTab._on_rolling_min_max_toggled
+## SettingsTab
 
-Keyboard Shortcuts (MainWindow)
+`app/ui/tab_settings.py` emits `settings_changed` for plot-style, processing,
+display-unit, and export-unit changes. `MainWindow` connects that signal to
+`PlotController.update_all_plots_from_settings()`.
 
-- K: cycle legend position across presets (default/top-left/top-right/bottom-right/bottom-left)
-- L: toggle legend visibility
-Both trigger PlotController.update_all_plots_from_settings to refresh figures.
+### Graphical Settings
 
-Domain-Specific UI Toggles
+- Legend font size.
+- Default font size.
+- Hover font size.
+- Hover mode: closest, x, y, x unified, or y unified.
+- Trace opacity.
 
-- TIME domain:
-  - SingleDataTab exposes: Section Data, Low-Pass Filter, Spectrum controls
-  - PartLoadsTab exposes: Section Data, Tukey Window, Tukey α
-  - SettingsTab: Rolling Min-Max envelope enabled
+These values are applied to the shared `Plotter` instance.
 
-- FREQ domain:
-  - TimeDomainRepresent tab is shown; SingleData phase plot enabled for single-folder
-  - Time-domain-only controls are hidden
+### TIME Processing Settings
 
-Export Configuration
+- Rolling Min-Max Envelope.
+- Desired number of points.
+- Plot as bars.
 
-- Export Full CSV (MainWindow): writes current combined df (including DataFolder) to user-chosen path using the currently selected display units
-- Settings tab Export Units selector:
-  - Source Units: extracted time-history and ANSYS CSV exports keep detected file units
-  - Display Units: extracted time-history and ANSYS CSV exports convert to the selected display units
-  - Steady-state time-history export uses its own unit selectors in that dialog
-- ANSYS Export (ActionHandler → AnsysExporter):
-  - FREQ → create_harmonic_template: uses magnitudes and Phase_ columns; scales to kN / kN·m; generates APDL tables
-  - TIME → create_transient_template: partitions large tables; sets analysis settings from inferred sample rate
+The rolling envelope controls are enabled only for `TIME` data. When enabled,
+Single Data plots route through `Plotter.create_rolling_envelope_figure(...)`.
 
+### Display Units
 
+After data load, `MainWindow` builds one selector per known quantity family from
+the detected source-unit context. Display-unit choices affect plotted/displayed
+values.
 
+Unknown or native-only source units are reported in the Settings summary but are
+not freely convertible.
+
+### Export Units
+
+The Settings-tab export-unit selector controls extracted time-domain CSV and
+ANSYS part-load CSV/template workflows:
+
+- Source Units: keep detected source units where possible.
+- Display Units: use the currently selected display units.
+
+The steady-state time-history export dialog has separate per-column unit
+selectors and does not rely only on the Settings-tab export-unit mode.
+
+## MainWindow Shortcuts
+
+- `K`: cycle legend position.
+- `L`: toggle legend visibility.
+
+Both shortcuts trigger a plot refresh through `PlotController`.
+
+## Export Behavior
+
+- Full CSV writes the current combined `MainWindow.df` directly to a selected
+  path.
+- Reconstructed time-domain extraction samples `TimeDomainRepresentTab` plot
+  data and labels columns with the selected export units.
+- ANSYS export validates domain, force, moment, and phase unit families before
+  calling `AnsysExporter`.
+- Harmonic export uses `FREQ`, magnitude columns, and `Phase_...` columns.
+- Transient export uses `TIME` data and partitions large load tables inside the
+  exporter.

@@ -1,26 +1,30 @@
 # Documentation Update Summary
 
 ## Overview
-This update introduces a comprehensive documentation suite for the `app` package to support developers, analysts, and stakeholders. Key themes include architectural transparency, user guidance, maintenance planning, and delivery confirmation.
 
-## New or Replaced Artifacts
-- `README.md`: Modernized project overview and quick-start instructions.
-- `START_HERE.md`: Contributor onboarding checklist.
-- `ARCHITECTURE.md`: Deep dive into layered design, data flow, and dependencies.
-- `FILE_INDEX.md`: Module-by-module inventory.
-- `DETAILED_USER_MANUAL.md`: End-user walkthrough covering every tab and export option.
-- `SIGNAL_SLOT_REFERENCE.md`: Mapping of cross-module Qt signal connections.
-- `EXECUTIVE_SUMMARY.md` & `EXECUTIVE_SUMMARY_MECHANICAL_ENGINEERING.md`: Stakeholder-facing context.
-- `REFACTORING_PROGRESS.md`: Current tech-debt assessment and suggested roadmap.
-- `STATUS_REPORT.md`: Snapshot of project health, risks, and next steps.
-- `COMPLETION_REPORT.md`, `FINAL_DELIVERY_COMPLETE.md`, `FINAL_DELIVERY_SUMMARY.md`, `FINAL_PROJECT_STATE.md`, `DELIVERY_MANIFEST.md`: Delivery confirmation artifacts.
-- `requirements.txt`: Explicit dependency list for the application layer.
+The documentation set has been refreshed against the current WE-DAVIS source
+tree. The update focuses on architecture, file inventory, signal wiring,
+README/developer guidance, unit-aware exports, steady-state workflows, and
+current verification commands.
 
-## Highlights
-- Clear separation of audiences: executives, mechanical engineers, developers, and QA now have tailored references.
-- Signal and controller documentation reduces onboarding time for UI contributors.
-- User manual captures actionable troubleshooting advice, reducing support burden.
+## Updated Areas
+
+- Architecture references now include `app/units/`, steady-state helpers,
+  current dialogs, unit-context flow, and automated tests.
+- File index line counts and module responsibilities were refreshed.
+- Signal references now include unit-context payloads, load progress/failure
+  signals, steady-state action signals, and the Part Loads to Time Domain
+  Representation refresh path.
+- README/developer docs now use the current `WE-DAVIS` name, root
+  `requirements.txt`, `python main.py`, `python -m unittest discover -s tests
+  -p "test_*.py"`, and `python -m PyInstaller --noconfirm WE-DAVIS.spec`.
+- Export docs now describe source/display export-unit modes and
+  `AnsysExportUnits` rather than fixed scaling.
+- User/UI docs now cover display units, export-unit mode, steady-state
+  time-history export, and soft start.
 
 ## Follow-Up
-- Consider attaching sample `.pld` datasets or schema descriptions to assist readers unfamiliar with the raw files.
-- Schedule periodic reviews (per release) to keep documentation synchronized with future feature work.
+
+- Re-run this refresh after any major UI/export/refactor work.
+- Keep `FILE_INDEX.md` line counts in the release checklist.
+- Add Qt signal/wiring tests when the environment supports headless Qt.

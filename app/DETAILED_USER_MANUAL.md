@@ -1,121 +1,142 @@
 # Detailed User Manual
 
-This guide walks through the complete workflow for WE MechLoad Viewer, from installing prerequisites to exporting analysis artifacts for downstream mechanical work.
+This guide covers the main WE-DAVIS workflow from setup through plotting,
+comparison, and export.
 
 ## 1. System Requirements
-- Windows 10+ (PyQt5 with QtWebEngine requires a desktop environment).
-- Python 3.10 or newer.
-- Optional: Ansys Mechanical with the `ansys-mechanical-core` Python package for template export workflows.
+
+- Windows 10/11.
+- Python 3.12.
+- PyQt5 and PyQtWebEngine from the pinned root requirements.
+- Optional: licensed ANSYS Mechanical plus `ansys-mechanical-core` for template
+  generation.
 
 ## 2. Installation
-1. Ensure Python is on your PATH.
-2. Install dependencies: `pip install -r app/requirements.txt`.
-3. (Optional) Install `ansys-mechanical-core` via your licensed distribution if you plan to use the Ansys export button.
 
-## 3. Launching the Application
-1. From the repository root run `python main.py`.
-2. When the file dialog appears, select the directory that contains the raw data folders. Each folder must include:
-   - `full.pld`: primary numeric data.
-   - `max.pld`: header definitions and interface labels.
-3. The application will merge all selected folders, detect whether the data is in the frequency (`FREQ`) or time (`TIME`) domain, and enable the relevant tabs.
-4. Use the dock on the left to bring in additional folders at any time. Selecting a new set replaces the current dataset.
+From the repository root:
 
-## 4. Layout Overview
-- **Menu Bar**
-  - *File → Open New Data*: launches the folder picker again.
-  - *File → Export Full Data as CSV*: saves the merged DataFrame (including `DataFolder`) to disk.
-  - *View → Data Folders*: show or hide the directory dock.
-- **Directory Dock**: browse and select multiple data folders from the filesystem. Selections trigger a reload.
-- **Tabs**: each tab focuses on a specific analysis workflow (details below).
-- **Keyboard Shortcuts**
-  - `K`: cycle the legend position across predefined corners.
-  - `L`: toggle legend visibility.
+```powershell
+python -m venv venv
+venv\Scripts\activate
+python -m pip install -r requirements.txt
+```
 
-## 5. Working with Tabs
+## 3. Launch
 
-### 5.1 Single Data Tab
-- Choose a channel from the column selector; only applicable channels for the current domain are listed.
-- For time-domain data:
-  - Enable *Section Data* to limit the plot to a min/max time window.
-  - Use *Apply Low-Pass Filter* to smooth the selected channel (Butterworth filter).
-  - Toggle *Show Spectrum Plot* for short-time FFT visualizations; pick the plot type and colorscale.
-- For frequency-domain data:
-  - A phase plot appears automatically if phase information exists and only one folder is loaded.
-- Computed options:
-  - `Time Step (Δt)` and `Sampling Rate (Hz)` appear when you load time-domain data; both are derived from the raw samples.
+```powershell
+python main.py
+```
 
-### 5.2 Interface Data Tab
-- Select an interface (e.g., `I1A`) and a side (extracted from channel names).
-- View translational (T1/T2/T3) and rotational (R1/R2/R3) components stacked vertically.
-- Use this tab to check symmetry or correlation across channels without comparison data.
+On startup, select a folder containing one or more data files ending in
+`full.pld` and a header file ending in `max.pld`. Suffix matching is
+case-insensitive. Bundled samples are under `resources/sample_data/`.
 
-### 5.3 Part Loads Tab
-- Pick the side of interest.
-- Choose whether to exclude secondary components (T2/T3/R2/R3) while keeping resultant channels like `T2/T3`.
-- Time-domain extras:
-  - *Section Data* to clip the time range.
-  - *Apply Tukey Window* (with alpha control) to taper edges before exports.
-- *Extract Part Loads as FEA Input (ANSYS)*: launches the Ansys export workflow (details in Section 6).
+The app detects `TIME` or `FREQ`, rejects mixed-domain selections, builds source
+unit metadata from headers, and enables the relevant tabs.
 
-### 5.4 Time Domain Representation Tab
-- Appears only for frequency-domain datasets.
-- Select a frequency from the drop-down; the app reconstructs time-domain traces using amplitude and phase information.
-- Use the interval selector to choose angular increments and export sampled points to CSV.
+## 4. Main Window
 
-### 5.5 Compare Data Tab
-- Click *Select Data for Comparison* to load a second dataset (same folder structure as the primary).
-- Choose a common channel to see:
-  - Overlaid original vs comparison traces.
-  - Absolute difference plot.
-  - Relative (percent) difference plot.
-- Columns missing in either dataset are skipped automatically.
+- File > Open New Data: choose a replacement dataset.
+- File > Export Full Data as CSV: write the current combined DataFrame.
+- View menu: show or hide the directory dock.
+- Directory dock: select one or more folders after a primary dataset is loaded.
+- `K`: cycle legend position.
+- `L`: toggle legend visibility.
 
-### 5.6 Compare Part Loads Tab
-- Select a side and optional component suppression (same semantics as Part Loads Tab).
-- View difference plots for translational and rotational groups across the full domain.
+## 5. Tabs
 
-### 5.7 Settings Tab
-- *Rolling Min-Max Envelope*: replaces single-channel traces with rolling envelopes (time-domain only) and toggles bar rendering.
-- *Legend / Font / Hover Controls*: update Plotly styling in real time.
-- *Trace Opacity*: adjust global opacity applied to every trace across the app.
+### Single Data
+
+- Select one non-phase channel.
+- For `TIME`, optional controls include Section Data, Low-Pass Filter, Spectrum,
+  `Time Step (dt)`, and `Sampling Rate (Hz)`.
+- For single-folder `FREQ`, a matching phase plot appears when phase data exists.
+
+### Interface Data
+
+- Select one or more interfaces and one or more sides.
+- Translational and rotational plots show selected interface/side pairs.
+
+### Part Loads
+
+- Select one or more part sides.
+- Exclude secondary components where needed.
+- For `TIME`, apply Section Data or Tukey Window before plotting/export.
+- Export Part Loads as FEA Input opens the unit-aware ANSYS export workflow.
+
+### Time Domain Representation
+
+Available for `FREQ` data.
+
+- Select a frequency and interval.
+- The app reconstructs one-cycle time histories from magnitude and phase data.
+- Extract Data writes sampled one-cycle data to CSV.
+- Estimate Cycles to Steady State opens the damping/residual estimator.
+- Export Steady-State Time History opens a repeated-cycle export dialog with
+  unit selectors and optional soft-start ramp.
+
+### Compare Data
+
+- Select comparison data from a compatible secondary folder.
+- Choose a common column.
+- Review overlay, absolute difference, and relative difference plots.
+
+### Compare Part Loads
+
+- Select side and exclusion options.
+- Review translational and rotational part-load differences. For `FREQ`, phase
+  data is used for complex difference calculations where available.
+
+### Settings
+
+- Configure rolling min/max envelope behavior for `TIME` data.
+- Configure Plotly font sizes, hover mode, and trace opacity.
+- Select display units by detected quantity family.
+- Select export-unit mode:
+  - Source Units keeps detected source units where possible.
+  - Display Units uses the current display-unit selections.
 
 ## 6. Export Workflows
 
-### 6.1 Full Data CSV
-- Go to *File → Export Full Data as CSV*.
-- Choose a destination path. The exported file includes every column and the `DataFolder` tag for traceability.
+### Full Data CSV
 
-### 6.2 Tabular Extracts
-- *Single Data / Compare Tabs*: Use the context buttons (e.g., *Extract Data*) to write the currently selected subset to CSV. Valid only when a plot is present.
-- *Time Domain Representation*: Select a frequency and interval, then click *Extract Data at Each Interval as CSV file* to download time-sampled results.
+File > Export Full Data as CSV writes the current combined DataFrame, including
+`DataFolder`, to the chosen path.
 
-### 6.3 Ansys Mechanical Templates
-1. Load the desired dataset and switch to the Part Loads tab.
-2. Press *Extract Part Loads as FEA Input (ANSYS)*.
-3. A dialog appears with two sections:
-   - **Select Parts**: Choose one or more sides to export.
-   - **ANSYS Version**: Select which ANSYS version to use for template generation.
-4. The ANSYS Version dropdown automatically detects installed versions from `C:\Program Files\ANSYS Inc` (e.g., ANSYS v232, v231).
-   - Versions are sorted with the latest version listed first and selected by default.
-   - If no versions are detected, the dropdown shows "Use Latest Available" and will use the latest version found by `ansys-mechanical-core`.
-5. Click Confirm to proceed with the export.
-6. The application exports unit-aware CSV files using the Settings tab's Export Units mode, shows a confirmation dialog, opens the combined CSV file with the OS default app, and then launches the selected version of Ansys Mechanical through the automation API:
-   - Frequency-domain data creates a harmonic response template with complex loads.
-   - Time-domain data creates a transient template with the appropriate sampling rate.
-7. On success the generated `.mechdat` assets are saved in the working directory and Ansys is opened for review.
+### Reconstructed Time-Domain CSV
+
+In Time Domain Representation, select a frequency and interval, then Extract
+Data. Values are exported according to the Settings-tab export-unit mode.
+
+### Steady-State Time History CSV
+
+In Time Domain Representation, open Export Steady-State Time History. Choose
+whole cycles, soft-start settings, and export units. Soft Start applies a
+one-sided half-cosine ramp to load/data columns only; the time column is not
+ramped.
+
+### ANSYS Mechanical Templates
+
+1. Load the dataset and open Part Loads.
+2. Select sides and optional `TIME` conditioning.
+3. Click Export Part Loads as FEA Input.
+4. Choose sides and ANSYS version/path options.
+5. Confirm.
+
+The app writes unit-aware per-side CSV files plus a combined CSV, validates
+ANSYS quantity families, then creates:
+
+- harmonic templates for `FREQ`;
+- transient templates for `TIME`.
 
 ## 7. Troubleshooting
-- **Folder selection dialog keeps reappearing**: the initial load is required. Canceling the very first prompt will close the app; relaunch and choose a valid folder.
-- **Tabs disabled**: Certain tabs require single-folder context or matching columns. Load exactly one folder to view interface or part load tabs.
-- **Blank plots**: Verify the selected channel exists and contains numeric data. For spectrum plots ensure the `Spectrum Slices` input is a positive integer.
-- **Comparison data rejected**: Both datasets must share the same domain (`TIME` vs `FREQ`) and the target column names. Clean up header mismatches in the source `.pld` files.
-- **Ansys export fails**: The error dialog will indicate if the selected version is not supported or produced errors during initialization. Check that:
-  - `ansys-mechanical-core` is installed and licensed.
-  - The selected ANSYS version is installed properly and supports the export operation.
-  - Try selecting a different ANSYS version from the dropdown if the current one fails.
-  - Review the detailed error message for specific issues like missing channels or data inconsistencies.
-- **No ANSYS versions detected**: The application looks for versions in `C:\Program Files\ANSYS Inc`. If your installation is in a custom location, the dropdown will show "Use Latest Available" and rely on the default version detection by `ansys-mechanical-core`.
 
-## 8. Support
-- Bug reports and feature requests go to the maintainer listed in the Settings tab footer.
-- Include the exported full-data CSV and the application log (console output) when submitting an issue.
+- Startup cancel closes the app: relaunch and select a valid folder.
+- Tabs disabled: many analysis tabs require exactly one loaded folder.
+- Blank plot: verify the selected channel exists and contains numeric data.
+- Comparison rejected: primary and comparison data must share the same domain.
+- Unit conversion unavailable: the source unit may be unknown or native-only.
+- ANSYS export fails: verify ANSYS installation, licensing,
+  `ansys-mechanical-core`, selected version/path, and unit validation errors.
+- Large datasets feel slow: use rolling envelopes and limit expensive plot
+  rebuilds where possible.

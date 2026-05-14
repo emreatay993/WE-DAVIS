@@ -1,45 +1,87 @@
 # WE-DAVIS
 
-WE-DAVIS is a PyQt5 desktop application for inspecting mechanical load datasets produced by WE Davis style test rigs. It ingests raw `.pld` exports, exposes rich visualizations with Plotly, compares multiple runs, and prepares data for FEA handoff.
+WE-DAVIS is a PyQt5 desktop application for inspecting WE Davis mechanical load
+datasets. It ingests `.pld` exports, plots frequency-domain and time-domain
+data with Plotly, compares runs, and prepares unit-aware CSV/ANSYS handoff
+artifacts.
 
 ## Core Capabilities
-- Load one or more raw data folders containing `full.pld` and `max.pld` pairs and automatically stitch them into a single pandas DataFrame.
-- Switch between frequency-domain and time-domain analysis with context-aware tooling (phase plots, spectrum views, Tukey windowing, sectioning, sampling-metric overlays).
-- Browse dataset folders, plot individual signals, compare runs, and inspect part loads and interface forces through dedicated tabs.
-- Export harmonized CSV files and generate Ansys Mechanical templates directly from the UI with selectable ANSYS version support.
-- Control global Plotly styling (fonts, legend placement, hover behavior, opacity) without touching code.
+
+- Load one or more folders containing one or more `*full.pld` data files plus a
+  `*max.pld` header file. Suffix matching is case-insensitive.
+- Detect `TIME` or `FREQ` data, reject mixed-domain folder selections, merge
+  valid folders, and preserve provenance with a `DataFolder` column.
+- Track source units from PLD headers, expose display-unit selectors, and let
+  extraction/ANSYS workflows choose source-unit or display-unit export mode.
+- Plot single channels, interface loads, part loads, comparison overlays,
+  absolute/relative differences, spectra, and rolling min/max envelopes.
+- Reconstruct one-cycle time histories from frequency data and export repeated
+  steady-state histories with optional soft-start ramping.
+- Generate ANSYS Mechanical harmonic or transient templates from selected part
+  loads with validated force/moment/domain/phase units.
 
 ## Quick Start
-1. Install dependencies: `pip install -r requirements.txt` (see `app/requirements.txt`).
-2. Launch the app from the repo root: `python main.py`.
-3. When prompted, pick a raw data folder whose filenames end with `full.pld` (data) and `max.pld` (header). Bundled sample folders live under `resources/sample_data/`.
-4. Use the left dock to add more folders at any time. Tabs will enable or disable automatically based on how many folders and which domain type were detected.
+
+Use the repository root for setup and execution.
+
+```powershell
+python -m venv venv
+venv\Scripts\activate
+python -m pip install -r requirements.txt
+python main.py
+```
+
+The root `requirements.txt` is the pinned runnable/buildable environment. The
+package-local `app/requirements.txt` is a looser runtime manifest and is not the
+preferred install source for reproducible development.
+
+On startup, choose a data folder whose filenames end with `full.pld` and
+`max.pld`. Bundled repository samples live under `resources/sample_data/`; those
+sample folders are not bundled by the current PyInstaller spec.
 
 ## Data Expectations
-- Each selected folder should contain harmonized `.pld` exports with either a `FREQ` or `TIME` column.
-- The loader matches files by suffix, so names such as `PLD_DATA_0_full.pld` and `PLD_HEADER_DATA_max.pld` are valid inputs.
-- `max.pld` files supply channel labels. Frequency-domain loads also expect matching `Phase_` columns; these are constructed automatically.
-- Mixed domain folders are rejected for safety; reload data if you need to switch between TIME and FREQ datasets.
-- The app decorates every row with a `DataFolder` column to preserve provenance across merged runs.
+
+- Each selected folder must contain data with either a `TIME` or `FREQ` column.
+- `DataManager` matches PLD files by suffix, so names such as
+  `PLD_DATA_0_full.pld`, `PLD_DATA_1_FULL.pld`, and
+  `PLD_HEADER_DATA_max.pld` are valid.
+- The `max.pld` header provides channel labels and source units.
+- Frequency-domain datasets use `Phase_...` columns for phase-aware plotting,
+  comparison, reconstruction, and ANSYS export.
+- Comparison data must match the primary dataset's domain.
 
 ## Project Layout
-- `main.py` is the entry point; it wires the Qt application, constructs `DataManager`, and shows `MainWindow`.
-- `app/data_manager.py` reads and validates raw data, emits pandas DataFrames, and handles comparison imports.
-- `app/main_window.py` sets up the UI shell, menus, tabs, and connects signals to controllers.
-- `app/controllers/plot_controller.py` centralizes Plotly figure creation logic and keeps all tabs in sync.
-- `app/controllers/action_handler.py` handles workflow-style operations such as Ansys exports and CSV extraction.
-- `app/analysis/` provides reusable data processing utilities and the Ansys exporter integration.
-- `app/ui/` contains the QWidget subclasses that define each tab and the directory browser dock.
-- `app/plotting/plotter.py` wraps Plotly figure assembly, spectrum generation, and HTML embedding.
 
-See `app/FILE_INDEX.md` for a detailed inventory and `app/ARCHITECTURE.md` for the full architectural overview.
+- `main.py`: application entry point.
+- `app/main_window.py`: composition root, top-level state, unit preferences,
+  menus, tabs, dock, and signal wiring.
+- `app/data_manager.py`: PLD loading, domain validation, unit-context creation,
+  and comparison loading.
+- `app/controllers/plot_controller.py`: plot refresh slots and display-unit
+  projection.
+- `app/controllers/action_handler.py`: comparison selection, CSV extraction,
+  steady-state dialogs, unit-aware part-load export, and ANSYS orchestration.
+- `app/analysis/`: data-processing helpers, ANSYS exporter, steady-state cycle
+  estimator, and steady-state time-history export helpers.
+- `app/units/`: unit catalog, context model, conversion helpers, and errors.
+- `app/ui/`: tab widgets, dialogs, directory dock, and reusable UI widgets.
+- `app/plotting/plotter.py`: Plotly figure factories and webview loading.
+
+See `FILE_INDEX.md`, `ARCHITECTURE.md`, and `SIGNAL_SLOT_REFERENCE.md` for the
+detailed app-local references.
+
+## Verification
+
+Run the current automated test suite from the repository root:
+
+```powershell
+python -m unittest discover -s tests -p "test_*.py"
+```
 
 ## Additional Resources
-- `../docs/WE-DAVIS_v0.9_User_Showcase.md`: user-facing summary of recent v0.9 capabilities.
-- `../docs/CHANGELOG_2026-04-21.md`: detailed changelog for the recent development window.
-- `START_HERE.md`: onboarding checklist for new contributors.
-- `DETAILED_USER_MANUAL.md`: end-user walkthrough of every tab and export.
-- `SIGNAL_SLOT_REFERENCE.md`: mapping of all Qt signal connections.
-- `REFACTORING_PROGRESS.md`: notes on current technical debt and potential improvements.
 
-For questions or feature requests, contact the maintainer listed in the Settings tab footer.
+- `../docs/README.md`: documentation landing page.
+- `../docs/Architecture.md`: public architecture summary.
+- `../docs/DataFlow-and-Signals.md`: end-to-end data and Qt signal flow.
+- `../docs/Developer-Guide.md`: setup, packaging, and verification notes.
+- `../resources/sample_data/README.md`: bundled sample data summary.

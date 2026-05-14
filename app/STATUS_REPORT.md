@@ -1,27 +1,37 @@
 # Status Report
 
-**Date:** _(fill in when sharing)_  
-**Prepared by:** Codex (GPT-5)
+**Prepared:** 2026-05-14
 
 ## Overall Status
-- ✅ Documentation refresh complete.
-- ⚠️ Technical debt remains in data ingestion error handling and export automation.
-- ⏳ Test automation is still pending.
 
-## Highlights
-- Added 16 documentation artifacts covering strategy, architecture, onboarding, usage, maintenance, and delivery confirmation.
-- Captured dependency list in `requirements.txt` to stabilize environment parity.
-- Identified key refactoring priorities in `REFACTORING_PROGRESS.md`.
+- Documentation references have been refreshed against the current source tree.
+- Automated `unittest` coverage exists for unit contracts, PLD metadata loading,
+  plotting unit projection, settings unit controls, export-unit modes, and
+  steady-state time-history export helpers.
+- The app has current support for unit-aware plotting/export, steady-state
+  dialogs, and source/display export-unit modes.
 
-## Risks
-- Lack of automated regression tests means future refactors rely on manual QA.
-- Ansys integration depends on external software availability; failures are surfaced only at runtime.
-- Large datasets could impact responsiveness; caching and async loading are not yet implemented.
+## Current Strengths
 
-## Next Steps
-1. Review and socialize the new documentation package with engineering and test teams.
-2. Prioritize low-effort refactors (see `REFACTORING_PROGRESS.md`) to improve stability.
-3. Define a testing strategy (sample datasets, CI configuration) to reduce manual verification overhead.
+- Clear ownership boundaries: `MainWindow`, `DataManager`, controllers,
+  analysis services, plotting, units, and UI widgets.
+- Current app-local references: `ARCHITECTURE.md`, `FILE_INDEX.md`, and
+  `SIGNAL_SLOT_REFERENCE.md`.
+- Repository sample data under `resources/sample_data/` supports manual smoke
+  checks for both `FREQ` and `TIME` workflows.
 
-## Blockers
-- None identified for documentation; further improvements depend on available development bandwidth and access to representative datasets.
+## Open Risks
+
+- Initial startup cancel still exits the app.
+- Large loads and expensive plot rebuilds are synchronous and can block the UI.
+- ANSYS export depends on local installation, licensing, and automation API
+  compatibility.
+- UI signal coverage is still mostly manual; current automated tests focus on
+  service/data contracts.
+
+## Recommended Next Steps
+
+1. Replace first-load `sys.exit(1)` cancel behavior with a soft failure path.
+2. Add focused Qt signal tests for tab wiring and selector behavior.
+3. Evaluate worker-thread or async loading for large PLD datasets.
+4. Keep docs and `FILE_INDEX.md` in the release checklist.
